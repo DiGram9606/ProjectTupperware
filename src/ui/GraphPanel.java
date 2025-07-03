@@ -51,7 +51,6 @@ public class GraphPanel extends JPanel {
     }
 
     private void drawGrid(Graphics2D g2, int width, int height, double xScale, double yScale) {
-        // Simple grid lines
         g2.setColor(new Color(60, 60, 60));
         g2.setStroke(new BasicStroke(0.5f));
         

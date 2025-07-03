@@ -18,12 +18,10 @@ public class DesmosCloneApp extends JFrame {
     private List<PlotFunction> functions = new ArrayList<>();
     private Color bgColor = Color.BLACK;
     
-    // Axis limits components
     private JTextField xMinField, xMaxField, yMinField, yMaxField;
     private JButton setLimitsButton;
     private JButton resetLimitsButton;
     
-    // Status components
     private JLabel statusLabel;
     private JLabel functionCountLabel;
 
@@ -40,14 +38,12 @@ public class DesmosCloneApp extends JFrame {
     }
 
     private void initializeComponents() {
-        // Simple function controls
         functionTypeBox = new JComboBox<>(new String[]{
             "sin(x)", "cos(x)", "tan(x)", "x^2", "x^3", "2x+3", "log(x)", "exp(x)", "step(x)"
         });
         
         parametersField = new JTextField("1", 8);
         
-        // Simple, readable buttons
         plotButton = new JButton("Plot Function");
         plotButton.setFont(new Font("Arial", Font.PLAIN, 12));
         
@@ -57,7 +53,6 @@ public class DesmosCloneApp extends JFrame {
         bgColorButton = new JButton("Background Color");
         bgColorButton.setFont(new Font("Arial", Font.PLAIN, 12));
         
-        // Simple text fields
         xMinField = new JTextField("-10", 8);
         xMaxField = new JTextField("10", 8);
         yMinField = new JTextField("-10", 8);
@@ -69,14 +64,12 @@ public class DesmosCloneApp extends JFrame {
         resetLimitsButton = new JButton("Reset");
         resetLimitsButton.setFont(new Font("Arial", Font.PLAIN, 12));
         
-        // Simple status labels
         statusLabel = new JLabel("Ready to plot functions");
         statusLabel.setFont(new Font("Arial", Font.PLAIN, 11));
         
         functionCountLabel = new JLabel("Functions: 0");
         functionCountLabel.setFont(new Font("Arial", Font.PLAIN, 11));
         
-        // Graph panel
         graphPanel = new GraphPanel();
         graphPanel.setBackground(bgColor);
         graphPanel.setBorder(BorderFactory.createLineBorder(Color.GRAY));
@@ -85,11 +78,9 @@ public class DesmosCloneApp extends JFrame {
     private void layoutComponents() {
         setLayout(new BorderLayout(5, 5));
         
-        // Top panel for controls
         JPanel topPanel = new JPanel(new BorderLayout(5, 5));
         topPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 5, 10));
         
-        // Function controls panel
         JPanel functionPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
         functionPanel.setBorder(BorderFactory.createTitledBorder("Function Controls"));
         
@@ -101,7 +92,6 @@ public class DesmosCloneApp extends JFrame {
         functionPanel.add(clearButton);
         functionPanel.add(bgColorButton);
         
-        // Limits panel
         JPanel limitsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
         limitsPanel.setBorder(BorderFactory.createTitledBorder("Axis Limits"));
         
@@ -119,7 +109,6 @@ public class DesmosCloneApp extends JFrame {
         topPanel.add(functionPanel, BorderLayout.NORTH);
         topPanel.add(limitsPanel, BorderLayout.CENTER);
         
-        // Bottom status panel
         JPanel bottomPanel = new JPanel(new BorderLayout());
         bottomPanel.setBorder(BorderFactory.createEmptyBorder(5, 10, 10, 10));
         bottomPanel.add(statusLabel, BorderLayout.WEST);
@@ -146,7 +135,6 @@ public class DesmosCloneApp extends JFrame {
         setLimitsButton.addActionListener(e -> setAxisLimits());
         resetLimitsButton.addActionListener(e -> resetLimits());
         
-        // Enter key shortcuts
         parametersField.addActionListener(e -> plotFunction());
         xMinField.addActionListener(e -> setAxisLimits());
         xMaxField.addActionListener(e -> setAxisLimits());
