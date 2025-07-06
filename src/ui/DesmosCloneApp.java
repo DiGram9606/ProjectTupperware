@@ -1,12 +1,15 @@
 package src.ui;
 
 import src.util.PlotFunction;
+import src.util.IntersectionSolver;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
+
+
 
 public class DesmosCloneApp extends JFrame {
     private GraphPanel graphPanel;
@@ -15,6 +18,8 @@ public class DesmosCloneApp extends JFrame {
     private JButton plotButton;
     private JButton clearButton;
     private JButton bgColorButton;
+    private JButton intersectionButton;
+
     private List<PlotFunction> functions = new ArrayList<>();
     private Color bgColor = Color.BLACK;
     
@@ -52,6 +57,10 @@ public class DesmosCloneApp extends JFrame {
         
         bgColorButton = new JButton("Background Color");
         bgColorButton.setFont(new Font("Arial", Font.PLAIN, 12));
+
+        intersectionButton = new JButton("Find Intersections");
+        intersectionButton.setFont(new Font("Arial", Font.PLAIN, 12));
+
         
         xMinField = new JTextField("-10", 8);
         xMaxField = new JTextField("10", 8);
@@ -91,6 +100,9 @@ public class DesmosCloneApp extends JFrame {
         functionPanel.add(plotButton);
         functionPanel.add(clearButton);
         functionPanel.add(bgColorButton);
+        functionPanel.add(intersectionButton);
+
+
         
         JPanel limitsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
         limitsPanel.setBorder(BorderFactory.createTitledBorder("Axis Limits"));
@@ -132,6 +144,10 @@ public class DesmosCloneApp extends JFrame {
                 graphPanel.setBackground(bgColor);
             }
         });
+
+        intersectionButton.addActionListener(e -> findIntersections());
+
+
         setLimitsButton.addActionListener(e -> setAxisLimits());
         resetLimitsButton.addActionListener(e -> resetLimits());
         
@@ -242,4 +258,49 @@ public class DesmosCloneApp extends JFrame {
             statusLabel.setText("Displaying " + functions.size() + " function(s)");
         }
     }
+
+    private void findIntersections() {
+if (functions.size() < 2) {
+JOptionPane.showMessageDialog(this, 
+"You need at least 2 functions to find intersections.", 
+"Not Enough Functions", JOptionPane.INFORMATION_MESSAGE);
+return;
 }
+
+List<IntersectionSolver.IntersectionPoint> allIntersections = new ArrayList<>();
+
+for (int i = 0; i < functions.size(); i++) {
+for (int j = i + 1; j < functions.size(); j++) {
+PlotFunction f1 = functions.get(i);
+PlotFunction f2 = functions.get(j);
+
+List<IntersectionSolver.IntersectionPoint> intersections = 
+IntersectionSolver.findAllIntersections(f1, f2, -10, 10);
+allIntersections.addAll(intersections);
+}
+}
+
+if (allIntersections.isEmpty()) {
+statusLabel.setText("No intersections found in the current range");
+} else {
+statusLabel.setText("Found " + allIntersections.size() + " intersection(s)");
+showIntersections(allIntersections);
+}
+}
+
+private void showIntersections(List<IntersectionSolver.IntersectionPoint> intersections) {
+StringBuilder message = new StringBuilder("Intersection Points Found:\n\n");
+
+for (IntersectionSolver.IntersectionPoint point : intersections) {
+message.append(String.format("Between %s and %s:\n", 
+point.function1Name, point.function2Name));
+message.append(String.format("  Point: (%.3f, %.3f)\n\n", 
+point.point.getX(), point.point.getY()));
+}
+
+JOptionPane.showMessageDialog(this, message.toString(), 
+"Intersection Results", JOptionPane.INFORMATION_MESSAGE);
+}
+
+}
+
