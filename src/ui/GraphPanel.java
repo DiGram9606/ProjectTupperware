@@ -1,145 +1,265 @@
 package src.ui;
 
 import src.util.PlotFunction;
+import src.util.IntersectionSolver;
+import src.util.AreaCalculator;
 import javax.swing.*;
 import java.awt.*;
-import java.awt.geom.Path2D;
+import java.awt.event.*;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
 
-public class GraphPanel extends JPanel {
-    private List<PlotFunction> functions;
-    private double xMin = -10, xMax = 10, yMin = -10, yMax = 10;
+public class DesmosCloneApp extends JFrame {
+    private GraphPanel graphPanel;
+    private JComboBox<String> functionTypeBox;
+    private JTextField parametersField;
+    private JButton plotButton, clearButton, bgColorButton, intersectionButton;
+    private JButton saveButton, loadButton;
+    private JButton areaButton;
+    private JTextField areaFromField, areaToField;
 
-    public void setFunctions(List<PlotFunction> functions) {
-        this.functions = functions;
+    private List<PlotFunction> functions = new ArrayList<>();
+    private Color bgColor = Color.BLACK;
+
+    private JTextField xMinField, xMaxField, yMinField, yMaxField;
+    private JButton setLimitsButton, resetLimitsButton;
+
+    private JLabel statusLabel, functionCountLabel;
+
+    public DesmosCloneApp() {
+        setTitle("Function Plotter");
+        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setSize(1000, 700);
+        setLocationRelativeTo(null);
+
+        initializeComponents();
+        layoutComponents();
+        setupEventListeners();
+        updateStatus();
     }
 
-    public void setLimits(double xMin, double xMax, double yMin, double yMax) {
-        this.xMin = xMin;
-        this.xMax = xMax;
-        this.yMin = yMin;
-        this.yMax = yMax;
-        repaint();
+    private void initializeComponents() {
+        functionTypeBox = new JComboBox<>(new String[]{
+            "sin(x)", "cos(x)", "tan(x)", "x^2", "x^3", "2x+3", "log(x)", "exp(x)", "step(x)"
+        });
+
+        parametersField = new JTextField("1", 8);
+        plotButton = new JButton("Plot Function");
+        clearButton = new JButton("Clear All");
+        bgColorButton = new JButton("Background Color");
+        intersectionButton = new JButton("Find Intersections");
+        saveButton = new JButton("Save");
+        loadButton = new JButton("Load");
+
+        xMinField = new JTextField("-10", 5);
+        xMaxField = new JTextField("10", 5);
+        yMinField = new JTextField("-10", 5);
+        yMaxField = new JTextField("10", 5);
+        setLimitsButton = new JButton("Apply Limits");
+        resetLimitsButton = new JButton("Reset");
+
+        areaButton = new JButton("Calculate Area");
+        areaFromField = new JTextField("-5", 5);
+        areaToField = new JTextField("5", 5);
+
+        statusLabel = new JLabel("Ready to plot functions");
+        functionCountLabel = new JLabel("Functions: 0");
+
+        graphPanel = new GraphPanel();
+        graphPanel.setBackground(bgColor);
+        graphPanel.setBorder(BorderFactory.createLineBorder(Color.GRAY));
     }
 
-    public GraphPanel() {
-        setBackground(Color.BLACK);
+    private void layoutComponents() {
+        setLayout(new BorderLayout(5, 5));
+        JPanel topPanel = new JPanel(new BorderLayout(5, 5));
+        topPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 5, 10));
+
+        JPanel functionPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
+        functionPanel.setBorder(BorderFactory.createTitledBorder("Function Controls"));
+        functionPanel.add(new JLabel("Function:"));
+        functionPanel.add(functionTypeBox);
+        functionPanel.add(new JLabel("Parameter:"));
+        functionPanel.add(parametersField);
+        functionPanel.add(plotButton);
+        functionPanel.add(clearButton);
+        functionPanel.add(bgColorButton);
+        functionPanel.add(intersectionButton);
+        functionPanel.add(saveButton);
+        functionPanel.add(loadButton);
+
+        JPanel limitsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
+        limitsPanel.setBorder(BorderFactory.createTitledBorder("Axis Limits"));
+        limitsPanel.add(new JLabel("X Min:"));
+        limitsPanel.add(xMinField);
+        limitsPanel.add(new JLabel("X Max:"));
+        limitsPanel.add(xMaxField);
+        limitsPanel.add(new JLabel("Y Min:"));
+        limitsPanel.add(yMinField);
+        limitsPanel.add(new JLabel("Y Max:"));
+        limitsPanel.add(yMaxField);
+        limitsPanel.add(setLimitsButton);
+        limitsPanel.add(resetLimitsButton);
+
+        JPanel areaPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
+        areaPanel.setBorder(BorderFactory.createTitledBorder("Area Under Curve"));
+        areaPanel.add(new JLabel("From x:"));
+        areaPanel.add(areaFromField);
+        areaPanel.add(new JLabel("To x:"));
+        areaPanel.add(areaToField);
+        areaPanel.add(areaButton);
+
+        topPanel.add(functionPanel, BorderLayout.NORTH);
+        topPanel.add(limitsPanel, BorderLayout.CENTER);
+        topPanel.add(areaPanel, BorderLayout.SOUTH);
+
+        JPanel bottomPanel = new JPanel(new BorderLayout());
+        bottomPanel.setBorder(BorderFactory.createEmptyBorder(5, 10, 10, 10));
+        bottomPanel.add(statusLabel, BorderLayout.WEST);
+        bottomPanel.add(functionCountLabel, BorderLayout.EAST);
+
+        add(topPanel, BorderLayout.NORTH);
+        add(graphPanel, BorderLayout.CENTER);
+        add(bottomPanel, BorderLayout.SOUTH);
     }
 
-    @Override
-    protected void paintComponent(Graphics g) {
-        super.paintComponent(g);
-        Graphics2D g2 = (Graphics2D) g;
-        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+    private void setupEventListeners() {
+        plotButton.addActionListener(e -> plotFunction());
+        clearButton.addActionListener(e -> {
+            functions.clear();
+            graphPanel.repaint();
+            updateStatus();
+        });
+        bgColorButton.addActionListener(e -> {
+            bgColor = JColorChooser.showDialog(this, "Choose Background Color", bgColor);
+            if (bgColor != null) {
+                graphPanel.setBackground(bgColor);
+            }
+        });
+        intersectionButton.addActionListener(e -> findIntersections());
+        setLimitsButton.addActionListener(e -> setAxisLimits());
+        resetLimitsButton.addActionListener(e -> resetLimits());
+        areaButton.addActionListener(e -> calculateArea());
+    }
 
-        int width = getWidth();
-        int height = getHeight();
-        double xScale = width / (xMax - xMin);
-        double yScale = height / (yMax - yMin);
+    private void plotFunction() {
+        String type = (String) functionTypeBox.getSelectedItem();
+        double param;
 
-        drawGrid(g2, width, height, xScale, yScale);
-        drawAxes(g2, width, height, xScale, yScale);
-        drawLabels(g2, width, height, xScale, yScale);
+        try {
+            param = Double.parseDouble(parametersField.getText());
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(this, "Invalid parameter.");
+            return;
+        }
 
-        if (functions != null) {
-            for (PlotFunction pf : functions) {
-                drawFunction(g2, pf, width, height, xScale, yScale);
+        Function<Double, Double> func;
+        switch (type) {
+            case "sin(x)": func = x -> param * Math.sin(x); break;
+            case "cos(x)": func = x -> param * Math.cos(x); break;
+            case "tan(x)": func = x -> param * Math.tan(x); break;
+            case "x^2":    func = x -> param * x * x; break;
+            case "x^3":    func = x -> param * x * x * x; break;
+            case "2x+3":   func = x -> param * (2 * x + 3); break;
+            case "log(x)": func = x -> x <= 0 ? Double.NaN : param * Math.log(x); break;
+            case "exp(x)": func = x -> param * Math.exp(x); break;
+            case "step(x)":func = x -> x >= 0 ? param : 0; break;
+            default: return;
+        }
+
+        functions.add(new PlotFunction(type + " (param: " + param + ")", func));
+        graphPanel.setFunctions(functions);
+        graphPanel.repaint();
+        updateStatus();
+    }
+
+    private void setAxisLimits() {
+        try {
+            double xMin = Double.parseDouble(xMinField.getText());
+            double xMax = Double.parseDouble(xMaxField.getText());
+            double yMin = Double.parseDouble(yMinField.getText());
+            double yMax = Double.parseDouble(yMaxField.getText());
+
+            if (xMin >= xMax || yMin >= yMax) {
+                JOptionPane.showMessageDialog(this, "Invalid range.");
+                return;
+            }
+
+            graphPanel.setLimits(xMin, xMax, yMin, yMax);
+            graphPanel.repaint();
+            statusLabel.setText("Limits updated");
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(this, "Enter valid numbers.");
+        }
+    }
+
+    private void resetLimits() {
+        xMinField.setText("-10");
+        xMaxField.setText("10");
+        yMinField.setText("-10");
+        yMaxField.setText("10");
+        setAxisLimits();
+        statusLabel.setText("Limits reset");
+    }
+
+    private void updateStatus() {
+        functionCountLabel.setText("Functions: " + functions.size());
+        statusLabel.setText(functions.isEmpty() ? "Ready to plot functions" : "Displaying " + functions.size() + " function(s)");
+    }
+
+    private void findIntersections() {
+        if (functions.size() < 2) {
+            JOptionPane.showMessageDialog(this, "At least 2 functions required.");
+            return;
+        }
+
+        List<IntersectionSolver.IntersectionPoint> intersections = new ArrayList<>();
+        for (int i = 0; i < functions.size(); i++) {
+            for (int j = i + 1; j < functions.size(); j++) {
+                intersections.addAll(
+                    IntersectionSolver.findAllIntersections(
+                        functions.get(i), functions.get(j), -10, 10));
             }
         }
-        
-        drawLimitsInfo(g2);
-    }
 
-    private void drawGrid(Graphics2D g2, int width, int height, double xScale, double yScale) {
-        g2.setColor(new Color(60, 60, 60));
-        g2.setStroke(new BasicStroke(0.5f));
-        
-        for (double x = Math.ceil(xMin); x <= Math.floor(xMax); x++) {
-            int xPos = (int) ((x - xMin) * xScale);
-            g2.drawLine(xPos, 0, xPos, height);
-        }
-        
-        for (double y = Math.ceil(yMin); y <= Math.floor(yMax); y++) {
-            int yPos = height - (int) ((y - yMin) * yScale);
-            g2.drawLine(0, yPos, width, yPos);
-        }
-    }
-
-    private void drawAxes(Graphics2D g2, int width, int height, double xScale, double yScale) {
-        g2.setColor(Color.WHITE);
-        g2.setStroke(new BasicStroke(2.0f));
-        
-        int xAxisY = height - (int) ((0 - yMin) * yScale);
-        if (xAxisY >= 0 && xAxisY <= height) {
-            g2.drawLine(0, xAxisY, width, xAxisY);
-        }
-        
-        int yAxisX = (int) ((0 - xMin) * xScale);
-        if (yAxisX >= 0 && yAxisX <= width) {
-            g2.drawLine(yAxisX, 0, yAxisX, height);
-        }
-    }
-
-    private void drawLabels(Graphics2D g2, int width, int height, double xScale, double yScale) {
-        g2.setColor(Color.LIGHT_GRAY);
-        g2.setFont(new Font("Arial", Font.PLAIN, 12));
-        
-        int xAxisY = height - (int) ((0 - yMin) * yScale);
-        int yAxisX = (int) ((0 - xMin) * xScale);
-        
-        for (double x = Math.ceil(xMin); x <= Math.floor(xMax); x++) {
-            if (Math.abs(x) < 0.001) continue;
-            int xPos = (int) ((x - xMin) * xScale);
-            String label = String.format("%.0f", x);
-            g2.drawString(label, xPos - 5, Math.min(xAxisY + 18, height - 5));
-        }
-        
-        for (double y = Math.ceil(yMin); y <= Math.floor(yMax); y++) {
-            if (Math.abs(y) < 0.001) continue;
-            int yPos = height - (int) ((y - yMin) * yScale);
-            String label = String.format("%.0f", y);
-            g2.drawString(label, Math.max(yAxisX + 8, 5), yPos + 4);
-        }
-        
-        if (xMin < 0 && xMax > 0 && yMin < 0 && yMax > 0) {
-            g2.setColor(Color.WHITE);
-            g2.drawString("0", yAxisX + 8, xAxisY + 18);
-        }
-    }
-
-    private void drawFunction(Graphics2D g2, PlotFunction pf, int width, int height, double xScale, double yScale) {
-        g2.setColor(pf.getColor());
-        g2.setStroke(new BasicStroke(2.0f));
-        
-        Path2D path = new Path2D.Double();
-        boolean firstPoint = true;
-        double step = (xMax - xMin) / width;
-        
-        for (double x = xMin; x <= xMax; x += step) {
-            double y = pf.getFunction().apply(x);
-            
-            if (Double.isFinite(y) && y >= yMin && y <= yMax) {
-                int px = (int) ((x - xMin) * xScale);
-                int py = height - (int) ((y - yMin) * yScale);
-                
-                if (firstPoint) {
-                    path.moveTo(px, py);
-                    firstPoint = false;
-                } else {
-                    path.lineTo(px, py);
-                }
-            } else {
-                firstPoint = true;
+        if (intersections.isEmpty()) {
+            statusLabel.setText("No intersections found");
+        } else {
+            statusLabel.setText("Found " + intersections.size() + " intersections");
+            StringBuilder msg = new StringBuilder();
+            for (var pt : intersections) {
+                msg.append(String.format("Between %s and %s: (%.3f, %.3f)\n",
+                        pt.function1Name, pt.function2Name,
+                        pt.point.getX(), pt.point.getY()));
             }
+            JOptionPane.showMessageDialog(this, msg.toString(), "Intersections", JOptionPane.INFORMATION_MESSAGE);
         }
-        
-        g2.draw(path);
     }
 
-    private void drawLimitsInfo(Graphics2D g2) {
-        g2.setColor(Color.CYAN);
-        g2.setFont(new Font("Arial", Font.PLAIN, 12));
-        String info = String.format("Limits: X[%.1f, %.1f] Y[%.1f, %.1f]", xMin, xMax, yMin, yMax);
-        g2.drawString(info, 10, getHeight() - 10);
+    private void calculateArea() {
+        if (functions.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "No function plotted.");
+            return;
+        }
+
+        try {
+            double xFrom = Double.parseDouble(areaFromField.getText());
+            double xTo = Double.parseDouble(areaToField.getText());
+            if (xFrom >= xTo) {
+                JOptionPane.showMessageDialog(this, "From x must be less than To x");
+                return;
+            }
+
+            PlotFunction func = functions.get(functions.size() - 1);
+            double area = AreaCalculator.calculateArea(func.getFunction(), xFrom, xTo, 1000);
+            JOptionPane.showMessageDialog(this, String.format("Area from %.2f to %.2f = %.5f", xFrom, xTo, area));
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(this, "Invalid x-range for area.");
+        }
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> new DesmosCloneApp().setVisible(true));
     }
 }
