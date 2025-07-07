@@ -2,14 +2,14 @@ package src.ui;
 
 import src.util.PlotFunction;
 import src.util.IntersectionSolver;
+import src.util.SavedGraphState;
+
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
-
-
 
 public class DesmosCloneApp extends JFrame {
     private GraphPanel graphPanel;
@@ -19,14 +19,16 @@ public class DesmosCloneApp extends JFrame {
     private JButton clearButton;
     private JButton bgColorButton;
     private JButton intersectionButton;
+    private JButton saveButton;
+    private JButton loadButton;
 
     private List<PlotFunction> functions = new ArrayList<>();
     private Color bgColor = Color.BLACK;
-    
+
     private JTextField xMinField, xMaxField, yMinField, yMaxField;
     private JButton setLimitsButton;
     private JButton resetLimitsButton;
-    
+
     private JLabel statusLabel;
     private JLabel functionCountLabel;
 
@@ -35,7 +37,7 @@ public class DesmosCloneApp extends JFrame {
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setSize(1000, 700);
         setLocationRelativeTo(null);
-        
+
         initializeComponents();
         layoutComponents();
         setupEventListeners();
@@ -46,39 +48,44 @@ public class DesmosCloneApp extends JFrame {
         functionTypeBox = new JComboBox<>(new String[]{
             "sin(x)", "cos(x)", "tan(x)", "x^2", "x^3", "2x+3", "log(x)", "exp(x)", "step(x)"
         });
-        
+
         parametersField = new JTextField("1", 8);
-        
+
         plotButton = new JButton("Plot Function");
         plotButton.setFont(new Font("Arial", Font.PLAIN, 12));
-        
+
         clearButton = new JButton("Clear All");
         clearButton.setFont(new Font("Arial", Font.PLAIN, 12));
-        
+
         bgColorButton = new JButton("Background Color");
         bgColorButton.setFont(new Font("Arial", Font.PLAIN, 12));
 
         intersectionButton = new JButton("Find Intersections");
         intersectionButton.setFont(new Font("Arial", Font.PLAIN, 12));
 
-        
+        saveButton = new JButton("Save");
+        saveButton.setFont(new Font("Arial", Font.PLAIN, 12));
+
+        loadButton = new JButton("Load");
+        loadButton.setFont(new Font("Arial", Font.PLAIN, 12));
+
         xMinField = new JTextField("-10", 8);
         xMaxField = new JTextField("10", 8);
         yMinField = new JTextField("-10", 8);
         yMaxField = new JTextField("10", 8);
-        
+
         setLimitsButton = new JButton("Apply Limits");
         setLimitsButton.setFont(new Font("Arial", Font.PLAIN, 12));
-        
+
         resetLimitsButton = new JButton("Reset");
         resetLimitsButton.setFont(new Font("Arial", Font.PLAIN, 12));
-        
+
         statusLabel = new JLabel("Ready to plot functions");
         statusLabel.setFont(new Font("Arial", Font.PLAIN, 11));
-        
+
         functionCountLabel = new JLabel("Functions: 0");
         functionCountLabel.setFont(new Font("Arial", Font.PLAIN, 11));
-        
+
         graphPanel = new GraphPanel();
         graphPanel.setBackground(bgColor);
         graphPanel.setBorder(BorderFactory.createLineBorder(Color.GRAY));
@@ -86,13 +93,13 @@ public class DesmosCloneApp extends JFrame {
 
     private void layoutComponents() {
         setLayout(new BorderLayout(5, 5));
-        
+
         JPanel topPanel = new JPanel(new BorderLayout(5, 5));
         topPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 5, 10));
-        
+
         JPanel functionPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
         functionPanel.setBorder(BorderFactory.createTitledBorder("Function Controls"));
-        
+
         functionPanel.add(new JLabel("Function:"));
         functionPanel.add(functionTypeBox);
         functionPanel.add(new JLabel("Parameter:"));
@@ -101,12 +108,12 @@ public class DesmosCloneApp extends JFrame {
         functionPanel.add(clearButton);
         functionPanel.add(bgColorButton);
         functionPanel.add(intersectionButton);
+        functionPanel.add(saveButton);
+        functionPanel.add(loadButton);
 
-
-        
         JPanel limitsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
         limitsPanel.setBorder(BorderFactory.createTitledBorder("Axis Limits"));
-        
+
         limitsPanel.add(new JLabel("X Min:"));
         limitsPanel.add(xMinField);
         limitsPanel.add(new JLabel("X Max:"));
@@ -117,15 +124,15 @@ public class DesmosCloneApp extends JFrame {
         limitsPanel.add(yMaxField);
         limitsPanel.add(setLimitsButton);
         limitsPanel.add(resetLimitsButton);
-        
+
         topPanel.add(functionPanel, BorderLayout.NORTH);
         topPanel.add(limitsPanel, BorderLayout.CENTER);
-        
+
         JPanel bottomPanel = new JPanel(new BorderLayout());
         bottomPanel.setBorder(BorderFactory.createEmptyBorder(5, 10, 10, 10));
         bottomPanel.add(statusLabel, BorderLayout.WEST);
         bottomPanel.add(functionCountLabel, BorderLayout.EAST);
-        
+
         add(topPanel, BorderLayout.NORTH);
         add(graphPanel, BorderLayout.CENTER);
         add(bottomPanel, BorderLayout.SOUTH);
@@ -144,13 +151,13 @@ public class DesmosCloneApp extends JFrame {
                 graphPanel.setBackground(bgColor);
             }
         });
-
         intersectionButton.addActionListener(e -> findIntersections());
-
+        saveButton.addActionListener(e -> saveGraphStateToFile());
+        loadButton.addActionListener(e -> loadGraphStateFromFile());
 
         setLimitsButton.addActionListener(e -> setAxisLimits());
         resetLimitsButton.addActionListener(e -> resetLimits());
-        
+
         parametersField.addActionListener(e -> plotFunction());
         xMinField.addActionListener(e -> setAxisLimits());
         xMaxField.addActionListener(e -> setAxisLimits());
@@ -161,47 +168,25 @@ public class DesmosCloneApp extends JFrame {
     private void plotFunction() {
         String type = (String) functionTypeBox.getSelectedItem();
         double param;
-        
         try {
             param = Double.parseDouble(parametersField.getText());
         } catch (NumberFormatException e) {
-            JOptionPane.showMessageDialog(this, 
-                "Invalid parameter value. Please enter a valid number.", 
-                "Input Error", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Invalid parameter value.", "Input Error", JOptionPane.ERROR_MESSAGE);
             return;
         }
 
         Function<Double, Double> func;
         switch (type) {
-            case "sin(x)":
-                func = x -> param * Math.sin(x);
-                break;
-            case "cos(x)":
-                func = x -> param * Math.cos(x);
-                break;
-            case "tan(x)":
-                func = x -> param * Math.tan(x);
-                break;
-            case "x^2":
-                func = x -> param * x * x;
-                break;
-            case "x^3":
-                func = x -> param * x * x * x;
-                break;
-            case "2x+3":
-                func = x -> param * (2 * x + 3);
-                break;
-            case "log(x)":
-                func = x -> x <= 0 ? Double.NaN : param * Math.log(x);
-                break;
-            case "exp(x)":
-                func = x -> param * Math.exp(x);
-                break;
-            case "step(x)":
-                func = x -> x >= 0 ? param : 0;
-                break;
-            default:
-                return;
+            case "sin(x)": func = x -> param * Math.sin(x); break;
+            case "cos(x)": func = x -> param * Math.cos(x); break;
+            case "tan(x)": func = x -> param * Math.tan(x); break;
+            case "x^2": func = x -> param * x * x; break;
+            case "x^3": func = x -> param * x * x * x; break;
+            case "2x+3": func = x -> param * (2 * x + 3); break;
+            case "log(x)": func = x -> x <= 0 ? Double.NaN : param * Math.log(x); break;
+            case "exp(x)": func = x -> param * Math.exp(x); break;
+            case "step(x)": func = x -> x >= 0 ? param : 0; break;
+            default: return;
         }
 
         functions.add(new PlotFunction(type + " (param: " + param + ")", func));
@@ -217,27 +202,16 @@ public class DesmosCloneApp extends JFrame {
             double yMin = Double.parseDouble(yMinField.getText());
             double yMax = Double.parseDouble(yMaxField.getText());
 
-            if (xMin >= xMax) {
-                JOptionPane.showMessageDialog(this, 
-                    "X Min must be less than X Max", 
-                    "Invalid Range", JOptionPane.WARNING_MESSAGE);
-                return;
-            }
-            if (yMin >= yMax) {
-                JOptionPane.showMessageDialog(this, 
-                    "Y Min must be less than Y Max", 
-                    "Invalid Range", JOptionPane.WARNING_MESSAGE);
+            if (xMin >= xMax || yMin >= yMax) {
+                JOptionPane.showMessageDialog(this, "Invalid axis limits.", "Input Error", JOptionPane.WARNING_MESSAGE);
                 return;
             }
 
             graphPanel.setLimits(xMin, xMax, yMin, yMax);
             graphPanel.repaint();
-            statusLabel.setText("Limits updated successfully");
-            
-        } catch (NumberFormatException ex) {
-            JOptionPane.showMessageDialog(this, 
-                "Please enter valid numbers for all limit fields.", 
-                "Input Error", JOptionPane.ERROR_MESSAGE);
+            statusLabel.setText("Limits updated");
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(this, "Enter valid numbers.", "Input Error", JOptionPane.ERROR_MESSAGE);
         }
     }
 
@@ -247,60 +221,84 @@ public class DesmosCloneApp extends JFrame {
         yMinField.setText("-10");
         yMaxField.setText("10");
         setAxisLimits();
-        statusLabel.setText("Limits reset to default values");
+        statusLabel.setText("Limits reset");
     }
 
     private void updateStatus() {
         functionCountLabel.setText("Functions: " + functions.size());
-        if (functions.isEmpty()) {
-            statusLabel.setText("Ready to plot functions");
-        } else {
-            statusLabel.setText("Displaying " + functions.size() + " function(s)");
-        }
+        statusLabel.setText(functions.isEmpty() ? "Ready to plot functions" : "Displaying " + functions.size() + " function(s)");
     }
 
     private void findIntersections() {
-if (functions.size() < 2) {
-JOptionPane.showMessageDialog(this, 
-"You need at least 2 functions to find intersections.", 
-"Not Enough Functions", JOptionPane.INFORMATION_MESSAGE);
-return;
+        if (functions.size() < 2) {
+            JOptionPane.showMessageDialog(this, "Need at least 2 functions.", "Error", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+
+        List<IntersectionSolver.IntersectionPoint> all = new ArrayList<>();
+        for (int i = 0; i < functions.size(); i++) {
+            for (int j = i + 1; j < functions.size(); j++) {
+                all.addAll(IntersectionSolver.findAllIntersections(functions.get(i), functions.get(j), -10, 10));
+            }
+        }
+
+        if (all.isEmpty()) {
+            statusLabel.setText("No intersections found");
+        } else {
+            statusLabel.setText("Found " + all.size() + " intersection(s)");
+            showIntersections(all);
+        }
+    }
+
+    private void showIntersections(List<IntersectionSolver.IntersectionPoint> intersections) {
+        StringBuilder sb = new StringBuilder("Intersection Points:\n\n");
+        for (var p : intersections) {
+            sb.append(String.format("Between %s and %s:\n  Point: (%.3f, %.3f)\n\n",
+                p.function1Name, p.function2Name, p.point.getX(), p.point.getY()));
+        }
+        JOptionPane.showMessageDialog(this, sb.toString(), "Intersections", JOptionPane.INFORMATION_MESSAGE);
+    }
+
+    private void saveGraphStateToFile() {
+        List<SavedGraphState.SerializableFunction> serialized = new ArrayList<>();
+        for (PlotFunction pf : functions) {
+            try {
+                String label = pf.getLabel();
+                String type = label.split(" ")[0];
+                double param = Double.parseDouble(label.replaceAll(".*\\(param: ", "").replaceAll("\\)", ""));
+                serialized.add(new SavedGraphState.SerializableFunction(type, param));
+            } catch (Exception e) {
+                JOptionPane.showMessageDialog(this, "Failed to serialize function: " + e.getMessage());
+            }
+        }
+        SavedGraphState state = new SavedGraphState(serialized, bgColor);
+        try (java.io.ObjectOutputStream out = new java.io.ObjectOutputStream(new java.io.FileOutputStream("saved_graph.ser"))) {
+            out.writeObject(state);
+            JOptionPane.showMessageDialog(this, "Graph saved.");
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Error saving: " + e.getMessage());
+        }
+    }
+
+    private void loadGraphStateFromFile() {
+        try (java.io.ObjectInputStream in = new java.io.ObjectInputStream(new java.io.FileInputStream("saved_graph.ser"))) {
+            SavedGraphState state = (SavedGraphState) in.readObject();
+            functions.clear();
+            for (SavedGraphState.SerializableFunction sf : state.functions) {
+                functions.add(new PlotFunction(sf.label, sf.toFunction()));
+            }
+            this.bgColor = state.background;
+            graphPanel.setBackground(bgColor);
+            graphPanel.setFunctions(functions);
+            graphPanel.repaint();
+            updateStatus();
+            JOptionPane.showMessageDialog(this, "Graph loaded.");
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Error loading: " + e.getMessage());
+        }
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> new DesmosCloneApp().setVisible(true));
+    }
 }
-
-List<IntersectionSolver.IntersectionPoint> allIntersections = new ArrayList<>();
-
-for (int i = 0; i < functions.size(); i++) {
-for (int j = i + 1; j < functions.size(); j++) {
-PlotFunction f1 = functions.get(i);
-PlotFunction f2 = functions.get(j);
-
-List<IntersectionSolver.IntersectionPoint> intersections = 
-IntersectionSolver.findAllIntersections(f1, f2, -10, 10);
-allIntersections.addAll(intersections);
-}
-}
-
-if (allIntersections.isEmpty()) {
-statusLabel.setText("No intersections found in the current range");
-} else {
-statusLabel.setText("Found " + allIntersections.size() + " intersection(s)");
-showIntersections(allIntersections);
-}
-}
-
-private void showIntersections(List<IntersectionSolver.IntersectionPoint> intersections) {
-StringBuilder message = new StringBuilder("Intersection Points Found:\n\n");
-
-for (IntersectionSolver.IntersectionPoint point : intersections) {
-message.append(String.format("Between %s and %s:\n", 
-point.function1Name, point.function2Name));
-message.append(String.format("  Point: (%.3f, %.3f)\n\n", 
-point.point.getX(), point.point.getY()));
-}
-
-JOptionPane.showMessageDialog(this, message.toString(), 
-"Intersection Results", JOptionPane.INFORMATION_MESSAGE);
-}
-
-}
-
