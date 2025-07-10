@@ -1,17 +1,10 @@
 package src.ui;
 
-import java.awt.BasicStroke;
-import java.awt.Color;
-import java.awt.Font;
-import java.awt.Graphics;
-import java.awt.Graphics2D;
-import java.awt.RenderingHints;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
-import java.awt.event.MouseWheelEvent;
-import java.awt.event.MouseWheelListener;
+import java.awt.*;
+import java.awt.event.*;
 import java.awt.geom.Path2D;
 import java.util.List;
+import java.util.function.Function;
 import javax.swing.JPanel;
 import javax.swing.ToolTipManager;
 import src.util.PlotFunction;
@@ -26,6 +19,10 @@ public class GraphPanel extends JPanel {
     private int lastMouseX;
     private int lastMouseY;
     private String tooltipText = null;
+
+    // Area highlight fields
+    private Function<Double, Double> areaFunction = null;
+    private double areaA = 0, areaB = 0;
 
     public GraphPanel() {
         this.setBackground(Color.BLACK);
@@ -52,6 +49,13 @@ public class GraphPanel extends JPanel {
         this.xMax = xHi;
         this.yMin = yLo;
         this.yMax = yHi;
+        repaint();
+    }
+
+    public void highlightAreaUnder(Function<Double, Double> f, double a, double b) {
+        this.areaFunction = f;
+        this.areaA = a;
+        this.areaB = b;
         repaint();
     }
 
@@ -141,15 +145,49 @@ public class GraphPanel extends JPanel {
         int h = getHeight();
         double sX = w / (xMax - xMin);
         double sY = h / (yMax - yMin);
+
         drawGrid(g2, w, h, sX, sY);
         drawAxes(g2, w, h, sX, sY);
         drawLabels(g2, w, h, sX, sY);
+
+        if (areaFunction != null) {
+            drawHighlightedArea(g2, areaFunction, areaA, areaB, w, h, sX, sY);
+        }
+
         if (functions != null) {
             for (PlotFunction pf : functions) {
                 drawFunction(g2, pf, w, h, sX, sY);
             }
         }
+
         drawLimitsInfo(g2);
+    }
+
+    private void drawHighlightedArea(Graphics2D g2, Function<Double, Double> func, double a, double b,
+                                     int w, int h, double sX, double sY) {
+        int steps = 1000;
+        double step = (b - a) / steps;
+        int[] xPoints = new int[steps + 2];
+        int[] yPoints = new int[steps + 2];
+
+        for (int i = 0; i <= steps; i++) {
+            double x = a + i * step;
+            double y = func.apply(x);
+            int px = (int) ((x - xMin) * sX);
+            int py = h - (int) ((y - yMin) * sY);
+            xPoints[i] = px;
+            yPoints[i] = py;
+        }
+
+        // Close the polygon to x-axis
+        xPoints[steps + 1] = (int) ((b - xMin) * sX);
+        yPoints[steps + 1] = h - (int) ((0 - yMin) * sY);
+
+        xPoints[0] = (int) ((a - xMin) * sX);
+        yPoints[0] = h - (int) ((0 - yMin) * sY);
+
+        g2.setColor(new Color(255, 165, 0, 100)); // translucent orange
+        g2.fillPolygon(xPoints, yPoints, steps + 2);
     }
 
     private void drawGrid(Graphics2D g2, int w, int h, double sX, double sY) {
