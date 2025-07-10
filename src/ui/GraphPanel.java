@@ -5,7 +5,7 @@ import java.awt.event.*;
 import java.awt.geom.Path2D;
 import java.util.List;
 import java.util.function.Function;
-import javax.swing.JPanel;
+import javax.swing.*;
 import javax.swing.ToolTipManager;
 import src.util.PlotFunction;
 
@@ -20,9 +20,9 @@ public class GraphPanel extends JPanel {
     private int lastMouseY;
     private String tooltipText = null;
 
-    // Area highlight fields
-    private Function<Double, Double> areaFunction = null;
-    private double areaA = 0, areaB = 0;
+    private Function<Double, Double> highlightedFunc = null;
+    private double highlightA = 0;
+    private double highlightB = 0;
 
     public GraphPanel() {
         this.setBackground(Color.BLACK);
@@ -52,10 +52,15 @@ public class GraphPanel extends JPanel {
         repaint();
     }
 
-    public void highlightAreaUnder(Function<Double, Double> f, double a, double b) {
-        this.areaFunction = f;
-        this.areaA = a;
-        this.areaB = b;
+    public void highlightAreaUnder(Function<Double, Double> func, double a, double b) {
+        this.highlightedFunc = func;
+        this.highlightA = a;
+        this.highlightB = b;
+        repaint();
+    }
+
+    public void clearHighlight() {
+        this.highlightedFunc = null;
         repaint();
     }
 
@@ -145,14 +150,9 @@ public class GraphPanel extends JPanel {
         int h = getHeight();
         double sX = w / (xMax - xMin);
         double sY = h / (yMax - yMin);
-
         drawGrid(g2, w, h, sX, sY);
         drawAxes(g2, w, h, sX, sY);
         drawLabels(g2, w, h, sX, sY);
-
-        if (areaFunction != null) {
-            drawHighlightedArea(g2, areaFunction, areaA, areaB, w, h, sX, sY);
-        }
 
         if (functions != null) {
             for (PlotFunction pf : functions) {
@@ -160,34 +160,41 @@ public class GraphPanel extends JPanel {
             }
         }
 
+        if (highlightedFunc != null) {
+            drawHighlightedArea(g2, w, h, sX, sY);
+        }
+
         drawLimitsInfo(g2);
     }
 
-    private void drawHighlightedArea(Graphics2D g2, Function<Double, Double> func, double a, double b,
-                                     int w, int h, double sX, double sY) {
-        int steps = 1000;
-        double step = (b - a) / steps;
-        int[] xPoints = new int[steps + 2];
-        int[] yPoints = new int[steps + 2];
+    private void drawHighlightedArea(Graphics2D g2, int w, int h, double sX, double sY) {
+        Path2D.Double path = new Path2D.Double();
+        boolean started = false;
+        double step = (xMax - xMin) / w;
 
-        for (int i = 0; i <= steps; i++) {
-            double x = a + i * step;
-            double y = func.apply(x);
-            int px = (int) ((x - xMin) * sX);
-            int py = h - (int) ((y - yMin) * sY);
-            xPoints[i] = px;
-            yPoints[i] = py;
+        for (double x = highlightA; x <= highlightB; x += step) {
+            double y = highlightedFunc.apply(x);
+            if (Double.isFinite(y)) {
+                int px = (int) ((x - xMin) * sX);
+                int py = h - (int) ((y - yMin) * sY);
+                if (!started) {
+                    path.moveTo(px, py);
+                    started = true;
+                } else {
+                    path.lineTo(px, py);
+                }
+            }
         }
 
-        // Close the polygon to x-axis
-        xPoints[steps + 1] = (int) ((b - xMin) * sX);
-        yPoints[steps + 1] = h - (int) ((0 - yMin) * sY);
+        int endX = (int) ((highlightB - xMin) * sX);
+        int startX = (int) ((highlightA - xMin) * sX);
+        int baseY = h - (int) ((0 - yMin) * sY);
+        path.lineTo(endX, baseY);
+        path.lineTo(startX, baseY);
+        path.closePath();
 
-        xPoints[0] = (int) ((a - xMin) * sX);
-        yPoints[0] = h - (int) ((0 - yMin) * sY);
-
-        g2.setColor(new Color(255, 165, 0, 100)); // translucent orange
-        g2.fillPolygon(xPoints, yPoints, steps + 2);
+        g2.setColor(new Color(255, 255, 0, 100));
+        g2.fill(path);
     }
 
     private void drawGrid(Graphics2D g2, int w, int h, double sX, double sY) {
