@@ -6,153 +6,224 @@ import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseWheelEvent;
+import java.awt.event.MouseWheelListener;
 import java.awt.geom.Path2D;
-import java.util.Iterator;
 import java.util.List;
 import javax.swing.JPanel;
+import javax.swing.ToolTipManager;
 import src.util.PlotFunction;
 
 public class GraphPanel extends JPanel {
-   private List<PlotFunction> functions;
-   private double xMin = -10.0;
-   private double xMax = 10.0;
-   private double yMin = -10.0;
-   private double yMax = 10.0;
+    private List<PlotFunction> functions;
+    private double xMin = -10.0;
+    private double xMax = 10.0;
+    private double yMin = -10.0;
+    private double yMax = 10.0;
 
-   public void setFunctions(List<PlotFunction> var1) {
-      this.functions = var1;
-   }
+    private int lastMouseX;
+    private int lastMouseY;
+    private String tooltipText = null;
 
-   public void setLimits(double var1, double var3, double var5, double var7) {
-      this.xMin = var1;
-      this.xMax = var3;
-      this.yMin = var5;
-      this.yMax = var7;
-      this.repaint();
-   }
-
-   public GraphPanel() {
-      this.setBackground(Color.BLACK);
-   }
-
-   protected void paintComponent(Graphics var1) {
-      super.paintComponent(var1);
-      Graphics2D var2 = (Graphics2D)var1;
-      var2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-      int var3 = this.getWidth();
-      int var4 = this.getHeight();
-      double var5 = (double)var3 / (this.xMax - this.xMin);
-      double var7 = (double)var4 / (this.yMax - this.yMin);
-      this.drawGrid(var2, var3, var4, var5, var7);
-      this.drawAxes(var2, var3, var4, var5, var7);
-      this.drawLabels(var2, var3, var4, var5, var7);
-      if (this.functions != null) {
-         Iterator var9 = this.functions.iterator();
-
-         while(var9.hasNext()) {
-            PlotFunction var10 = (PlotFunction)var9.next();
-            this.drawFunction(var2, var10, var3, var4, var5, var7);
-         }
-      }
-
-      this.drawLimitsInfo(var2);
-   }
-
-   private void drawGrid(Graphics2D var1, int var2, int var3, double var4, double var6) {
-      var1.setColor(new Color(60, 60, 60));
-      var1.setStroke(new BasicStroke(0.5F));
-
-      double var8;
-      int var10;
-      for(var8 = Math.ceil(this.xMin); var8 <= Math.floor(this.xMax); ++var8) {
-         var10 = (int)((var8 - this.xMin) * var4);
-         var1.drawLine(var10, 0, var10, var3);
-      }
-
-      for(var8 = Math.ceil(this.yMin); var8 <= Math.floor(this.yMax); ++var8) {
-         var10 = var3 - (int)((var8 - this.yMin) * var6);
-         var1.drawLine(0, var10, var2, var10);
-      }
-
-   }
-
-   private void drawAxes(Graphics2D var1, int var2, int var3, double var4, double var6) {
-      var1.setColor(Color.WHITE);
-      var1.setStroke(new BasicStroke(2.0F));
-      int var8 = var3 - (int)((0.0 - this.yMin) * var6);
-      if (var8 >= 0 && var8 <= var3) {
-         var1.drawLine(0, var8, var2, var8);
-      }
-
-      int var9 = (int)((0.0 - this.xMin) * var4);
-      if (var9 >= 0 && var9 <= var2) {
-         var1.drawLine(var9, 0, var9, var3);
-      }
-
-   }
-
-   private void drawLabels(Graphics2D var1, int var2, int var3, double var4, double var6) {
-      var1.setColor(Color.LIGHT_GRAY);
-      var1.setFont(new Font("Arial", 0, 12));
-      int var8 = var3 - (int)((0.0 - this.yMin) * var6);
-      int var9 = (int)((0.0 - this.xMin) * var4);
-
-      double var10;
-      int var12;
-      String var13;
-      for(var10 = Math.ceil(this.xMin); var10 <= Math.floor(this.xMax); ++var10) {
-         if (!(Math.abs(var10) < 0.001)) {
-            var12 = (int)((var10 - this.xMin) * var4);
-            var13 = String.format("%.0f", var10);
-            var1.drawString(var13, var12 - 5, Math.min(var8 + 18, var3 - 5));
-         }
-      }
-
-      for(var10 = Math.ceil(this.yMin); var10 <= Math.floor(this.yMax); ++var10) {
-         if (!(Math.abs(var10) < 0.001)) {
-            var12 = var3 - (int)((var10 - this.yMin) * var6);
-            var13 = String.format("%.0f", var10);
-            var1.drawString(var13, Math.max(var9 + 8, 5), var12 + 4);
-         }
-      }
-
-      if (this.xMin < 0.0 && this.xMax > 0.0 && this.yMin < 0.0 && this.yMax > 0.0) {
-         var1.setColor(Color.WHITE);
-         var1.drawString("0", var9 + 8, var8 + 18);
-      }
-
-   }
-
-   private void drawFunction(Graphics2D var1, PlotFunction var2, int var3, int var4, double var5, double var7) {
-      var1.setColor(var2.getColor());
-      var1.setStroke(new BasicStroke(2.0F));
-      Path2D.Double var9 = new Path2D.Double();
-      boolean var10 = true;
-      double var11 = (this.xMax - this.xMin) / (double)var3;
-
-      for(double var13 = this.xMin; var13 <= this.xMax; var13 += var11) {
-         double var15 = (Double)var2.getFunction().apply(var13);
-         if (Double.isFinite(var15) && var15 >= this.yMin && var15 <= this.yMax) {
-            int var17 = (int)((var13 - this.xMin) * var5);
-            int var18 = var4 - (int)((var15 - this.yMin) * var7);
-            if (var10) {
-               var9.moveTo((double)var17, (double)var18);
-               var10 = false;
-            } else {
-               var9.lineTo((double)var17, (double)var18);
+    public GraphPanel() {
+        this.setBackground(Color.BLACK);
+        initPanZoomListeners();
+        ToolTipManager.sharedInstance().registerComponent(this);
+        this.setToolTipText("");
+        this.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                tooltipText = getFunctionPointText(e);
+                setToolTipText(tooltipText);
+                ToolTipManager.sharedInstance().mouseMoved(e);
             }
-         } else {
-            var10 = true;
-         }
-      }
+        });
+    }
 
-      var1.draw(var9);
-   }
+    public void setFunctions(List<PlotFunction> funcs) {
+        this.functions = funcs;
+        repaint();
+    }
 
-   private void drawLimitsInfo(Graphics2D var1) {
-      var1.setColor(Color.CYAN);
-      var1.setFont(new Font("Arial", 0, 12));
-      String var2 = String.format("Limits: X[%.1f, %.1f] Y[%.1f, %.1f]", this.xMin, this.xMax, this.yMin, this.yMax);
-      var1.drawString(var2, 10, this.getHeight() - 10);
-   }
+    public void setLimits(double xLo, double xHi, double yLo, double yHi) {
+        this.xMin = xLo;
+        this.xMax = xHi;
+        this.yMin = yLo;
+        this.yMax = yHi;
+        repaint();
+    }
+
+    private void initPanZoomListeners() {
+        this.addMouseWheelListener(new MouseWheelListener() {
+            @Override
+            public void mouseWheelMoved(MouseWheelEvent e) {
+                int rotation = e.getWheelRotation();
+                double factor = Math.pow(1.1, rotation);
+                int w = getWidth();
+                int h = getHeight();
+                double mouseX = e.getX();
+                double mouseY = e.getY();
+                double worldX = xMin + mouseX * (xMax - xMin) / w;
+                double worldY = yMax - mouseY * (yMax - yMin) / h;
+                double newWidth = (xMax - xMin) * factor;
+                double newHeight = (yMax - yMin) * factor;
+                xMin = worldX - (mouseX / w) * newWidth;
+                xMax = xMin + newWidth;
+                yMax = worldY + (mouseY / h) * newHeight;
+                yMin = yMax - newHeight;
+                repaint();
+            }
+        });
+
+        MouseAdapter ma = new MouseAdapter() {
+            @Override
+            public void mousePressed(MouseEvent e) {
+                lastMouseX = e.getX();
+                lastMouseY = e.getY();
+            }
+
+            @Override
+            public void mouseDragged(MouseEvent e) {
+                int x = e.getX();
+                int y = e.getY();
+                int dx = x - lastMouseX;
+                int dy = y - lastMouseY;
+                int w = getWidth();
+                int h = getHeight();
+                double worldDX = -dx * (xMax - xMin) / w;
+                double worldDY = dy * (yMax - yMin) / h;
+                xMin += worldDX;
+                xMax += worldDX;
+                yMin += worldDY;
+                yMax += worldDY;
+                lastMouseX = x;
+                lastMouseY = y;
+                repaint();
+            }
+        };
+        this.addMouseListener(ma);
+        this.addMouseMotionListener(ma);
+    }
+
+    private String getFunctionPointText(MouseEvent e) {
+        if (functions == null || functions.isEmpty()) return null;
+        int w = getWidth();
+        int h = getHeight();
+        double mouseX = e.getX();
+        double mouseY = e.getY();
+        double worldX = xMin + mouseX * (xMax - xMin) / w;
+        final int tol = 5;
+        for (PlotFunction pf : functions) {
+            double y = pf.getFunction().apply(worldX);
+            if (Double.isFinite(y)) {
+                double screenY = h - (y - yMin) * h / (yMax - yMin);
+                if (Math.abs(screenY - mouseY) <= tol) {
+                    return String.format("(%.3f, %.3f)", worldX, y);
+                }
+            }
+        }
+        return null;
+    }
+
+    @Override
+    public String getToolTipText(MouseEvent e) {
+        return tooltipText;
+    }
+
+    @Override
+    protected void paintComponent(Graphics g) {
+        super.paintComponent(g);
+        Graphics2D g2 = (Graphics2D) g;
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        int w = getWidth();
+        int h = getHeight();
+        double sX = w / (xMax - xMin);
+        double sY = h / (yMax - yMin);
+        drawGrid(g2, w, h, sX, sY);
+        drawAxes(g2, w, h, sX, sY);
+        drawLabels(g2, w, h, sX, sY);
+        if (functions != null) {
+            for (PlotFunction pf : functions) {
+                drawFunction(g2, pf, w, h, sX, sY);
+            }
+        }
+        drawLimitsInfo(g2);
+    }
+
+    private void drawGrid(Graphics2D g2, int w, int h, double sX, double sY) {
+        g2.setColor(new Color(60, 60, 60));
+        g2.setStroke(new BasicStroke(0.5f));
+        for (double x = Math.ceil(xMin); x <= Math.floor(xMax); x++) {
+            int px = (int) ((x - xMin) * sX);
+            g2.drawLine(px, 0, px, h);
+        }
+        for (double y = Math.ceil(yMin); y <= Math.floor(yMax); y++) {
+            int py = h - (int) ((y - yMin) * sY);
+            g2.drawLine(0, py, w, py);
+        }
+    }
+
+    private void drawAxes(Graphics2D g2, int w, int h, double sX, double sY) {
+        g2.setColor(Color.WHITE);
+        g2.setStroke(new BasicStroke(2f));
+        int y0 = h - (int) ((0 - yMin) * sY);
+        if (y0 >= 0 && y0 <= h) g2.drawLine(0, y0, w, y0);
+        int x0 = (int) ((0 - xMin) * sX);
+        if (x0 >= 0 && x0 <= w) g2.drawLine(x0, 0, x0, h);
+    }
+
+    private void drawLabels(Graphics2D g2, int w, int h, double sX, double sY) {
+        g2.setColor(Color.LIGHT_GRAY);
+        g2.setFont(new Font("Arial", Font.PLAIN, 12));
+        int y0 = h - (int) ((0 - yMin) * sY);
+        int x0 = (int) ((0 - xMin) * sX);
+        for (double x = Math.ceil(xMin); x <= Math.floor(xMax); x++) {
+            if (Math.abs(x) > 1e-6) {
+                int px = (int) ((x - xMin) * sX);
+                g2.drawString(String.format("%.0f", x), px - 5, Math.min(y0 + 18, h - 5));
+            }
+        }
+        for (double y = Math.ceil(yMin); y <= Math.floor(yMax); y++) {
+            if (Math.abs(y) > 1e-6) {
+                int py = h - (int) ((y - yMin) * sY);
+                g2.drawString(String.format("%.0f", y), Math.max(x0 + 8, 5), py + 4);
+            }
+        }
+        if (xMin < 0 && xMax > 0 && yMin < 0 && yMax > 0) {
+            g2.setColor(Color.WHITE);
+            g2.drawString("0", x0 + 8, y0 + 18);
+        }
+    }
+
+    private void drawFunction(Graphics2D g2, PlotFunction pf, int w, int h, double sX, double sY) {
+        g2.setColor(pf.getColor());
+        g2.setStroke(new BasicStroke(2f));
+        Path2D.Double path = new Path2D.Double();
+        boolean started = false;
+        double step = (xMax - xMin) / w;
+        for (double x = xMin; x <= xMax; x += step) {
+            double y = pf.getFunction().apply(x);
+            if (Double.isFinite(y) && y >= yMin && y <= yMax) {
+                int px = (int) ((x - xMin) * sX);
+                int py = h - (int) ((y - yMin) * sY);
+                if (!started) {
+                    path.moveTo(px, py);
+                    started = true;
+                } else {
+                    path.lineTo(px, py);
+                }
+            } else {
+                started = false;
+            }
+        }
+        g2.draw(path);
+    }
+
+    private void drawLimitsInfo(Graphics2D g2) {
+        g2.setColor(Color.CYAN);
+        g2.setFont(new Font("Arial", Font.PLAIN, 12));
+        g2.drawString(String.format("Limits: X[%.2f, %.2f] Y[%.2f, %.2f]", xMin, xMax, yMin, yMax), 10, getHeight() - 10);
+    }
 }
