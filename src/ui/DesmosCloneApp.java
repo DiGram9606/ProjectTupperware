@@ -3,6 +3,7 @@ package src.ui;
 import src.util.PlotFunction;
 import src.util.IntersectionSolver;
 import src.util.SavedGraphState;
+import src.util.AreaCalculator;
 
 import javax.swing.*;
 import java.awt.*;
@@ -31,6 +32,11 @@ public class DesmosCloneApp extends JFrame {
 
     private JLabel statusLabel;
     private JLabel functionCountLabel;
+    private JLabel integralValueLabel;
+
+    // New components for integration
+    private JTextField lowerLimitField, upperLimitField;
+    private JButton calculateAreaButton;
 
     public DesmosCloneApp() {
         setTitle("Function Plotter");
@@ -86,6 +92,13 @@ public class DesmosCloneApp extends JFrame {
         functionCountLabel = new JLabel("Functions: 0");
         functionCountLabel.setFont(new Font("Arial", Font.PLAIN, 11));
 
+        integralValueLabel = new JLabel("Integral: N/A");
+        integralValueLabel.setFont(new Font("Arial", Font.PLAIN, 11));
+
+        lowerLimitField = new JTextField("0", 6);
+        upperLimitField = new JTextField("5", 6);
+        calculateAreaButton = new JButton("Calculate Area");
+
         graphPanel = new GraphPanel();
         graphPanel.setBackground(bgColor);
         graphPanel.setBorder(BorderFactory.createLineBorder(Color.GRAY));
@@ -125,12 +138,27 @@ public class DesmosCloneApp extends JFrame {
         limitsPanel.add(setLimitsButton);
         limitsPanel.add(resetLimitsButton);
 
+        JPanel areaPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
+        areaPanel.setBorder(BorderFactory.createTitledBorder("Definite Integral"));
+
+        areaPanel.add(new JLabel("Lower Limit:"));
+        areaPanel.add(lowerLimitField);
+        areaPanel.add(new JLabel("Upper Limit:"));
+        areaPanel.add(upperLimitField);
+        areaPanel.add(calculateAreaButton);
+
         topPanel.add(functionPanel, BorderLayout.NORTH);
         topPanel.add(limitsPanel, BorderLayout.CENTER);
+        topPanel.add(areaPanel, BorderLayout.SOUTH);
 
         JPanel bottomPanel = new JPanel(new BorderLayout());
         bottomPanel.setBorder(BorderFactory.createEmptyBorder(5, 10, 10, 10));
-        bottomPanel.add(statusLabel, BorderLayout.WEST);
+
+        JPanel bottomLeft = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        bottomLeft.add(statusLabel);
+        bottomLeft.add(integralValueLabel);
+
+        bottomPanel.add(bottomLeft, BorderLayout.WEST);
         bottomPanel.add(functionCountLabel, BorderLayout.EAST);
 
         add(topPanel, BorderLayout.NORTH);
@@ -144,6 +172,7 @@ public class DesmosCloneApp extends JFrame {
             functions.clear();
             graphPanel.repaint();
             updateStatus();
+            integralValueLabel.setText("Integral: N/A");
         });
         bgColorButton.addActionListener(e -> {
             bgColor = JColorChooser.showDialog(this, "Choose Background Color", bgColor);
@@ -163,7 +192,33 @@ public class DesmosCloneApp extends JFrame {
         xMaxField.addActionListener(e -> setAxisLimits());
         yMinField.addActionListener(e -> setAxisLimits());
         yMaxField.addActionListener(e -> setAxisLimits());
+
+        calculateAreaButton.addActionListener(e -> calculateDefiniteIntegral());
     }
+
+    private void calculateDefiniteIntegral() {
+    if (functions.isEmpty()) {
+        JOptionPane.showMessageDialog(this, "No function plotted.");
+        return;
+    }
+
+    try {
+        double a = Double.parseDouble(lowerLimitField.getText());
+        double b = Double.parseDouble(upperLimitField.getText());
+        PlotFunction pf = functions.get(functions.size() - 1);
+        Function<Double, Double> f = pf.getFunction();
+
+        double area = AreaCalculator.computeDefiniteIntegral(f, a, b, 1000);
+        graphPanel.highlightAreaUnder(f, a, b);
+        JOptionPane.showMessageDialog(this,
+            String.format("Definite integral from %.2f to %.2f:\nArea = %.5f", a, b, area),
+            "Integral Result", JOptionPane.INFORMATION_MESSAGE);
+    } catch (NumberFormatException ex) {
+        JOptionPane.showMessageDialog(this, "Invalid limits for integration.");
+    }
+}
+
+
 
     private void plotFunction() {
         String type = (String) functionTypeBox.getSelectedItem();
