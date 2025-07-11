@@ -1,5 +1,7 @@
 package src.util;
 
+import java.util.function.Function;
+
 public class LimitChecker {
 
     public static class LimitResult {
@@ -17,9 +19,10 @@ public class LimitChecker {
     /**
      * Approximates left and right limits near x0, and checks if function is differentiable.
      */
-    public static LimitResult checkLimit(String expr, double x0, double epsilon, double tolerance) throws Exception {
-        double left = Evaluator.evaluate(expr, x0 - epsilon);
-        double right = Evaluator.evaluate(expr, x0 + epsilon);
+    public static LimitResult checkLimit(String expr, double x0, double epsilon, double tolerance) {
+        Function<Double, Double> f = EquationParser.parse(expr);
+        double left = f.apply(x0 - epsilon);
+        double right = f.apply(x0 + epsilon);
         boolean differentiable = Math.abs(left - right) < tolerance;
         return new LimitResult(left, right, differentiable);
     }
