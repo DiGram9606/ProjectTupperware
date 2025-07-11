@@ -102,6 +102,10 @@ public class EquationParser {
                     case "sin": return Math.sin(arg);
                     case "cos": return Math.cos(arg);
                     case "tan": return Math.tan(arg);
+                    case "cosec":
+                    case "csc": return 1.0 / Math.sin(arg);
+                    case "sec": return 1.0 / Math.cos(arg);
+                    case "cot": return 1.0 / Math.tan(arg);
                     case "log": return Math.log(arg);
                     case "sqrt": return Math.sqrt(arg);
                     case "exp": return Math.exp(arg);
