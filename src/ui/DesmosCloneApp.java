@@ -310,28 +310,40 @@ public class DesmosCloneApp extends JFrame {
     }
 
     private void saveGraphStateToFile() {
-        List<SavedGraphState.SerializableFunction> serialized = new ArrayList<>();
-        for (PlotFunction pf : functions) {
-            try {
-                String label = pf.getLabel();
-                String type = label.split(" ")[0];
-                double param = Double.parseDouble(label.replaceAll(".*\\(param: ", "").replaceAll("\\)", ""));
-                serialized.add(new SavedGraphState.SerializableFunction(type, param));
-            } catch (Exception e) {
-                JOptionPane.showMessageDialog(this, "Failed to serialize function: " + e.getMessage());
-            }
+    List<SavedGraphState.SerializableFunction> serialized = new ArrayList<>();
+    for (PlotFunction pf : functions) {
+        try {
+            String label = pf.getLabel();
+            String type = label.split(" ")[0];
+            double param = Double.parseDouble(label.replaceAll(".*\\(param: ", "").replaceAll("\\)", ""));
+            serialized.add(new SavedGraphState.SerializableFunction(type, param));
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Failed to serialize function: " + e.getMessage());
         }
-        SavedGraphState state = new SavedGraphState(serialized, bgColor);
-        try (java.io.ObjectOutputStream out = new java.io.ObjectOutputStream(new java.io.FileOutputStream("saved_graph.ser"))) {
+    }
+
+    JFileChooser fileChooser = new JFileChooser();
+    fileChooser.setDialogTitle("Save Graph State");
+    int userSelection = fileChooser.showSaveDialog(this);
+    if (userSelection == JFileChooser.APPROVE_OPTION) {
+        java.io.File file = fileChooser.getSelectedFile();
+        try (java.io.ObjectOutputStream out = new java.io.ObjectOutputStream(new java.io.FileOutputStream(file))) {
+            SavedGraphState state = new SavedGraphState(serialized, bgColor);
             out.writeObject(state);
-            JOptionPane.showMessageDialog(this, "Graph saved.");
+            JOptionPane.showMessageDialog(this, "Graph saved to " + file.getName());
         } catch (Exception e) {
             JOptionPane.showMessageDialog(this, "Error saving: " + e.getMessage());
         }
     }
+}
 
-    private void loadGraphStateFromFile() {
-        try (java.io.ObjectInputStream in = new java.io.ObjectInputStream(new java.io.FileInputStream("saved_graph.ser"))) {
+private void loadGraphStateFromFile() {
+    JFileChooser fileChooser = new JFileChooser();
+    fileChooser.setDialogTitle("Load Graph State");
+    int userSelection = fileChooser.showOpenDialog(this);
+    if (userSelection == JFileChooser.APPROVE_OPTION) {
+        java.io.File file = fileChooser.getSelectedFile();
+        try (java.io.ObjectInputStream in = new java.io.ObjectInputStream(new java.io.FileInputStream(file))) {
             SavedGraphState state = (SavedGraphState) in.readObject();
             functions.clear();
             for (SavedGraphState.SerializableFunction sf : state.functions) {
@@ -342,11 +354,13 @@ public class DesmosCloneApp extends JFrame {
             graphPanel.setFunctions(functions);
             graphPanel.repaint();
             updateStatus();
-            JOptionPane.showMessageDialog(this, "Graph loaded.");
+            JOptionPane.showMessageDialog(this, "Graph loaded from " + file.getName());
         } catch (Exception e) {
             JOptionPane.showMessageDialog(this, "Error loading: " + e.getMessage());
         }
     }
+}
+
 
     private void openEquationMaker() {
         EquationMaker maker = new EquationMaker(this);
