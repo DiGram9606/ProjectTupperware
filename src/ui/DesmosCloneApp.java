@@ -3,14 +3,19 @@ package src.ui;
 import src.util.PlotFunction;
 import src.util.IntersectionSolver;
 import src.util.SavedGraphState;
+// import src.ui.DesmosCloneApp.ExtremaPoint;
 import src.util.AreaCalculator;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.*;
+// import java.awt.event.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Function;
+import java.util.stream.Collectors;
+// Add this import at the top of DesmosCloneApp.java
+import java.awt.geom.Point2D;
 
 public class DesmosCloneApp extends JFrame {
     private GraphPanel graphPanel;
@@ -43,6 +48,11 @@ public class DesmosCloneApp extends JFrame {
     private JButton calculateDerivativeButton;
     private JLabel derivativeValueLabel;
 
+    private JButton findExtremaButton;
+    private JTextField extremaSearchMinField;
+    private JTextField extremaSearchMaxField;
+    private JLabel extremaInfoLabel;
+
     public DesmosCloneApp() {
         setTitle("Function Plotter");
         setDefaultCloseOperation(EXIT_ON_CLOSE);
@@ -53,6 +63,21 @@ public class DesmosCloneApp extends JFrame {
         layoutComponents();
         setupEventListeners();
         updateStatus();
+    }
+
+    public class CriticalPoint {
+        public Point2D.Double point;
+        public String type; // "MAX", "MIN", "INFLECTION", or "UNKNOWN"
+
+        public CriticalPoint(Point2D.Double point, String type) {
+            this.point = point;
+            this.type = type.toUpperCase();
+        }
+
+        @Override
+        public String toString() {
+            return String.format("(%.3f, %.3f) - %s", point.x, point.y, type);
+        }
     }
 
     private void initializeComponents() {
@@ -104,6 +129,13 @@ public class DesmosCloneApp extends JFrame {
         calculateDerivativeButton = new JButton("Differentiate");
         derivativeValueLabel = new JLabel("Derivative: N/A");
         derivativeValueLabel.setFont(new Font("Arial", Font.PLAIN, 11));
+
+        findExtremaButton = new JButton("Find Extrema");
+        findExtremaButton.setFont(new Font("Arial", Font.PLAIN, 12));
+        extremaSearchMinField = new JTextField("-5", 6);
+        extremaSearchMaxField = new JTextField("5", 6);
+        extremaInfoLabel = new JLabel("Extrema: N/A");
+        extremaInfoLabel.setFont(new Font("Arial", Font.PLAIN, 11));
 
         lowerLimitField = new JTextField("0", 6);
         upperLimitField = new JTextField("5", 6);
@@ -183,6 +215,13 @@ public class DesmosCloneApp extends JFrame {
         diffPanel.add(calculateDerivativeButton);
         diffPanel.add(derivativeValueLabel);
 
+        diffPanel.add(new JLabel("Search Range:"));
+        diffPanel.add(extremaSearchMinField);
+        diffPanel.add(new JLabel("to"));
+        diffPanel.add(extremaSearchMaxField);
+        diffPanel.add(findExtremaButton);
+        diffPanel.add(extremaInfoLabel);
+
         // Add to topPanel below areaPanel:
         topPanel.add(diffPanel, BorderLayout.AFTER_LAST_LINE);
 
@@ -216,6 +255,7 @@ public class DesmosCloneApp extends JFrame {
         yMaxField.addActionListener(e -> setAxisLimits());
 
         calculateDerivativeButton.addActionListener(e -> calculateDerivative());
+        findExtremaButton.addActionListener(e -> findExtrema());
 
         calculateAreaButton.addActionListener(e -> calculateDefiniteIntegral());
     }
@@ -242,6 +282,266 @@ public class DesmosCloneApp extends JFrame {
         }
     }
 
+    // private void calculateDerivative() {
+    // if (functions.isEmpty()) {
+    // JOptionPane.showMessageDialog(this, "No function plotted.");
+    // return;
+    // }
+
+    // try {
+    // double x = Double.parseDouble(diffPointField.getText());
+    // PlotFunction pf = functions.get(functions.size() - 1); // Most recent
+    // function
+    // Function<Double, Double> f = pf.getFunction();
+
+    // double h = 1e-5;
+    // double derivative = (f.apply(x + h) - f.apply(x - h)) / (2 * h);
+
+    // derivativeValueLabel.setText(String.format("Derivative: f'(%1.2f) = %1.5f",
+    // x, derivative));
+    // JOptionPane.showMessageDialog(this,
+    // String.format("f'(%1.4f) ≈ %.6f", x, derivative),
+    // "Differentiation Result", JOptionPane.INFORMATION_MESSAGE);
+    // } catch (NumberFormatException ex) {
+    // JOptionPane.showMessageDialog(this, "Invalid input for x.");
+    // } catch (Exception e) {
+    // JOptionPane.showMessageDialog(this, "Error during differentiation: " +
+    // e.getMessage());
+    // }
+    // }
+
+    private void findExtrema() {
+        if (functions.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "No function plotted.");
+            return;
+        }
+
+        try {
+            double a = Double.parseDouble(extremaSearchMinField.getText());
+            double b = Double.parseDouble(extremaSearchMaxField.getText());
+            if (a >= b) {
+                JOptionPane.showMessageDialog(this, "Invalid range: min must be less than max");
+                return;
+            }
+
+            PlotFunction pf = functions.get(functions.size() - 1);
+            Function<Double, Double> f = pf.getFunction();
+
+            List<Point2D.Double> criticalPoints = findCriticalPoints(f, a, b);
+            // List<Point2D.Double> extrema = classifyCriticalPoints(f, criticalPoints);
+            // List<ExtremaPointCr> extrema = classifyCriticalPoints(f, criticalPoints);
+            List<CriticalPoint> inflectionPoints = findInflectionPoints(f, a, b);
+
+            List<CriticalPoint> allPoints = new ArrayList<>();
+            allPoints.addAll(classifyCriticalPoints(f, criticalPoints));
+            allPoints.addAll(inflectionPoints);
+
+            if (allPoints.isEmpty()) {
+                extremaInfoLabel.setText("No critical points found");
+                JOptionPane.showMessageDialog(this, "No critical points found in range.");
+            } else {
+                StringBuilder sb = new StringBuilder();
+                sb.append("Critical Points in range [").append(a).append(",").append(b).append("]:\n\n");
+
+                // Separate by type
+                Map<String, List<CriticalPoint>> grouped = allPoints.stream()
+                        .collect(Collectors.groupingBy(cp -> cp.type));
+
+                grouped.forEach((type, points) -> {
+                    sb.append(type).append(":\n");
+                    points.forEach(p -> sb.append("  ").append(p).append("\n"));
+                });
+
+                extremaInfoLabel.setText("Found " + allPoints.size() + " critical points");
+                graphPanel.displayCriticalPointsResults(sb.toString());
+
+                // Highlight all points on graph
+                List<Point2D.Double> pointsToHighlight = allPoints.stream()
+                        .map(cp -> cp.point)
+                        .collect(Collectors.toList());
+                List<String> pointTypes = new ArrayList<>();
+                for (int i = 0; i < pointsToHighlight.size(); i++) {
+                    pointTypes.add("INTERSECTION"); // or "MAX"/"MIN" depending on context
+                }
+                graphPanel.highlightPoints(pointsToHighlight, pointTypes);
+            }
+        } catch (
+
+        NumberFormatException ex) {
+            JOptionPane.showMessageDialog(this, "Invalid range values.");
+        }
+    }
+
+    // private List<Point2D.Double> findCriticalPoints(Function<Double, Double> f,
+    // double a, double b) {
+    // List<Point2D.Double> points = new ArrayList<>();
+    // double step = (b - a) / 1000.0;
+    // double h = 1e-5;
+
+    // for (double x = a + step; x < b - step; x += step) {
+    // try {
+    // double derivative = (f.apply(x + h) - f.apply(x - h)) / (2 * h);
+    // if (Math.abs(derivative) < 0.1) { // Threshold for critical point
+    // points.add(new Point2D.Double(x, f.apply(x)));
+    // }
+    // } catch (Exception e) {
+    // // Skip points where function is not differentiable
+    // }
+    // }
+    // return points;
+    // }
+
+    private void findCriticalPoints() {
+        if (functions.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "No function plotted.");
+            return;
+        }
+
+        try {
+            // 1. Get search range
+            double a = Double.parseDouble(extremaSearchMinField.getText());
+            double b = Double.parseDouble(extremaSearchMaxField.getText());
+            if (a >= b) {
+                JOptionPane.showMessageDialog(this, "Invalid range: min must be less than max");
+                return;
+            }
+
+            // 2. Get the target function (most recently plotted)
+            PlotFunction pf = functions.get(functions.size() - 1);
+            Function<Double, Double> f = pf.getFunction();
+
+            // 3. Find all critical points (where f'≈0)
+            List<Point2D.Double> criticalPoints = findCriticalPoints(f, a, b);
+
+            // 4. Find inflection points (where f''≈0)
+            List<CriticalPoint> inflectionPoints = findInflectionPoints(f, a, b);
+
+            // 5. Classify all found points
+            List<CriticalPoint> allPoints = new ArrayList<>();
+            allPoints.addAll(classifyCriticalPoints(f, criticalPoints));
+            allPoints.addAll(inflectionPoints);
+
+            // 6. Prepare visualization data
+            List<Point2D.Double> pointsToHighlight = allPoints.stream()
+                    .map(cp -> cp.point)
+                    .collect(Collectors.toList());
+
+            List<String> pointTypes = allPoints.stream()
+                    .map(cp -> cp.type)
+                    .collect(Collectors.toList());
+
+            System.out.println("Point types being sent: " + pointTypes);
+
+            graphPanel.highlightPoints(pointsToHighlight, pointTypes);
+
+            // 7. Display results
+            if (allPoints.isEmpty()) {
+                extremaInfoLabel.setText("No critical points found");
+                JOptionPane.showMessageDialog(this, "No critical points found in range.");
+            } else {
+                StringBuilder sb = new StringBuilder();
+                sb.append("Critical Points in range [")
+                        .append(String.format("%.2f", a))
+                        .append(",")
+                        .append(String.format("%.2f", b))
+                        .append("]:\n\n");
+
+                // Group by type (MAX/MIN/INFLECTION)
+                Map<String, List<CriticalPoint>> grouped = allPoints.stream()
+                        .collect(Collectors.groupingBy(cp -> cp.type));
+
+                // Format output
+                grouped.forEach((type, points) -> {
+                    sb.append(type).append(" (")
+                            .append(points.size()).append("):\n");
+                    points.forEach(p -> sb.append("  ").append(p).append("\n"));
+                });
+
+                extremaInfoLabel.setText("Found " + allPoints.size() + " critical points");
+                // graphPanel.displayCriticalPointsResults(sb.toString());
+                if (!allPoints.isEmpty()) {
+                    graphPanel.displayCriticalPointsResults(sb.toString());
+                }
+            }
+
+        } catch (NumberFormatException ex) {
+            JOptionPane.showMessageDialog(this, "Invalid range values.");
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Error: " + e.getMessage());
+        }
+    }
+
+    // Helper method to find raw critical points
+    private List<Point2D.Double> findCriticalPoints(Function<Double, Double> f, double a, double b) {
+        List<Point2D.Double> points = new ArrayList<>();
+        double step = (b - a) / 500.0;
+        double h = 1e-5;
+        double prevDerivative = (f.apply(a + h) - f.apply(a - h)) / (2 * h);
+
+        for (double x = a + step; x < b - step; x += step) {
+            try {
+                double derivative = (f.apply(x + h) - f.apply(x - h)) / (2 * h);
+
+                // Detect sign changes in derivative
+                if (prevDerivative * derivative <= 0 && Math.abs(derivative) < 0.1) {
+                    double refinedX = refineCriticalPoint(f, x - step, x + step);
+                    points.add(new Point2D.Double(refinedX, f.apply(refinedX)));
+                }
+                prevDerivative = derivative;
+            } catch (Exception e) {
+                // Skip discontinuities
+            }
+        }
+        return points;
+    }
+
+    private double refineCriticalPoint(Function<Double, Double> f, double a, double b) {
+        // Use bisection to find precise critical point
+        double tol = 1e-6;
+        double h = 1e-5;
+        while (b - a > tol) {
+            double c = (a + b) / 2;
+            double derivC = (f.apply(c + h) - f.apply(c - h)) / (2 * h);
+            double derivA = (f.apply(a + h) - f.apply(a - h)) / (2 * h);
+
+            if (derivA * derivC <= 0) {
+                b = c;
+            } else {
+                a = c;
+            }
+        }
+        return (a + b) / 2;
+    }
+
+    private List<CriticalPoint> classifyCriticalPoints(Function<Double, Double> f,
+            List<Point2D.Double> criticalPoints) {
+        List<CriticalPoint> classified = new ArrayList<>();
+        double h = 1e-5;
+
+        for (Point2D.Double p : criticalPoints) {
+            try {
+                // double secondDeriv = calculateSecondDerivative(f, p.x, h);
+                double secondDeriv = (f.apply(p.x + h) - 2 * f.apply(p.x) + f.apply(p.x - h)) / (h * h);
+                String type;
+
+                if (secondDeriv > 1e-3) { // Threshold for numerical stability
+                    type = "MIN";
+                } else if (secondDeriv < -1e-3) {
+                    type = "MAX";
+                } else {
+                    // Check third derivative to confirm inflection
+                    double thirdDeriv = (f.apply(p.x + h) - 3 * f.apply(p.x) +
+                            3 * f.apply(p.x - h) - f.apply(p.x - 2 * h)) / (h * h * h);
+                    type = Math.abs(thirdDeriv) > 1e-3 ? "INFLECTION" : "FLAT";
+                }
+                classified.add(new CriticalPoint(p, type));
+            } catch (Exception e) {
+                // Skip undifferentiable points
+            }
+        }
+        return classified;
+    }
+
     private void calculateDerivative() {
         if (functions.isEmpty()) {
             JOptionPane.showMessageDialog(this, "No function plotted.");
@@ -250,21 +550,89 @@ public class DesmosCloneApp extends JFrame {
 
         try {
             double x = Double.parseDouble(diffPointField.getText());
-            PlotFunction pf = functions.get(functions.size() - 1); // Most recent function
+            PlotFunction pf = functions.get(functions.size() - 1); // Use the last plotted function
             Function<Double, Double> f = pf.getFunction();
 
+            // Check if function is defined at the point
+            try {
+                double test = f.apply(x);
+                if (!Double.isFinite(test)) {
+                    throw new ArithmeticException("Function undefined at this point");
+                }
+            } catch (Exception e) {
+                derivativeValueLabel.setText("Derivative: Undefined at x = " + x);
+                JOptionPane.showMessageDialog(this,
+                        "Function is not defined at x = " + x,
+                        "Differentiation Error", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
             double h = 1e-5;
+            // Central difference method for more accuracy
             double derivative = (f.apply(x + h) - f.apply(x - h)) / (2 * h);
 
-            derivativeValueLabel.setText(String.format("Derivative: f'(%1.2f) = %1.5f", x, derivative));
+            // Check if result is valid
+            if (!Double.isFinite(derivative)) {
+                derivativeValueLabel.setText("Derivative: Undefined at x = " + x);
+                JOptionPane.showMessageDialog(this,
+                        "Derivative does not exist at x = " + x,
+                        "Differentiation Error", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
+            derivativeValueLabel.setText(String.format("Derivative: f'(%.2f) = %.5f", x, derivative));
             JOptionPane.showMessageDialog(this,
-                    String.format("f'(%1.4f) ≈ %.6f", x, derivative),
+                    String.format("f'(%.4f) ≈ %.6f", x, derivative),
                     "Differentiation Result", JOptionPane.INFORMATION_MESSAGE);
+
         } catch (NumberFormatException ex) {
-            JOptionPane.showMessageDialog(this, "Invalid input for x.");
+            JOptionPane.showMessageDialog(this, "Please enter a valid number for x.");
         } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Error during differentiation: " + e.getMessage());
+            JOptionPane.showMessageDialog(this, "Error calculating derivative: " + e.getMessage());
         }
+    }
+
+    private List<CriticalPoint> findInflectionPoints(Function<Double, Double> f, double a, double b) {
+        List<CriticalPoint> inflections = new ArrayList<>();
+        double step = (b - a) / 500.0;
+        double h = 1e-5;
+        double prevSecondDeriv = calculateSecondDerivative(f, a, h);
+
+        for (double x = a + step; x < b - step; x += step) {
+            double secondDeriv = calculateSecondDerivative(f, x, h);
+
+            // Detect sign change in second derivative
+            if (prevSecondDeriv * secondDeriv <= 0 &&
+                    Math.abs(secondDeriv) < 10.0) { // Threshold for numerical stability
+                double refinedX = refineInflectionPoint(f, x - step, x + step);
+                inflections.add(new CriticalPoint(
+                        new Point2D.Double(refinedX, f.apply(refinedX)),
+                        "INFLECTION"));
+            }
+            prevSecondDeriv = secondDeriv;
+        }
+        return inflections;
+    }
+
+    private double calculateSecondDerivative(Function<Double, Double> f, double x, double h) {
+        return (f.apply(x + h) - 2 * f.apply(x) + f.apply(x - h)) / (h * h);
+    }
+
+    private double refineInflectionPoint(Function<Double, Double> f, double a, double b) {
+        double tol = 1e-6;
+        double h = 1e-5;
+        while (b - a > tol) {
+            double c = (a + b) / 2;
+            double secondDerivC = calculateSecondDerivative(f, c, h);
+            double secondDerivA = calculateSecondDerivative(f, a, h);
+
+            if (secondDerivA * secondDerivC <= 0) {
+                b = c;
+            } else {
+                a = c;
+            }
+        }
+        return (a + b) / 2;
     }
 
     private void plotFunction() {

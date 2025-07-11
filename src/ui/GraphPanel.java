@@ -3,11 +3,16 @@ package src.ui;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.geom.Path2D;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
-import javax.swing.JPanel;
-import javax.swing.ToolTipManager;
+
 import src.util.PlotFunction;
+
+import javax.swing.*;
+import java.util.Map;
+import java.util.HashMap;
+import java.awt.geom.Point2D;
 
 public class GraphPanel extends JPanel {
     private List<PlotFunction> functions;
@@ -23,6 +28,10 @@ public class GraphPanel extends JPanel {
     // Area highlight fields
     private Function<Double, Double> areaFunction = null;
     private double areaA = 0, areaB = 0;
+
+    // private List<Point2D.Double> highlightedPoints = new ArrayList<>();
+    private Map<Point2D.Double, String> highlightedPoints = new HashMap<>();
+    private JTextArea resultsArea;
 
     public GraphPanel() {
         this.setBackground(Color.BLACK);
@@ -52,10 +61,39 @@ public class GraphPanel extends JPanel {
         repaint();
     }
 
+    public void displayCriticalPointsResults(String results) {
+        SwingUtilities.invokeLater(() -> {
+            JTextArea textArea = new JTextArea(results);
+            textArea.setEditable(false);
+            textArea.setLineWrap(true);
+            textArea.setWrapStyleWord(true);
+            textArea.setBackground(new Color(30, 30, 30));
+            textArea.setForeground(Color.WHITE);
+            textArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
+
+            JScrollPane scrollPane = new JScrollPane(textArea);
+            scrollPane.setPreferredSize(new Dimension(350, 150));
+
+            JOptionPane.showMessageDialog(
+                    this,
+                    scrollPane,
+                    "Critical Points Analysis",
+                    JOptionPane.INFORMATION_MESSAGE);
+        });
+    }
+
     public void highlightAreaUnder(Function<Double, Double> f, double a, double b) {
         this.areaFunction = f;
         this.areaA = a;
         this.areaB = b;
+        repaint();
+    }
+
+    public void highlightPoints(List<Point2D.Double> points, List<String> types) {
+        highlightedPoints.clear();
+        for (int i = 0; i < points.size(); i++) {
+            highlightedPoints.put(points.get(i), types.get(i));
+        }
         repaint();
     }
 
@@ -112,7 +150,8 @@ public class GraphPanel extends JPanel {
     }
 
     private String getFunctionPointText(MouseEvent e) {
-        if (functions == null || functions.isEmpty()) return null;
+        if (functions == null || functions.isEmpty())
+            return null;
         int w = getWidth();
         int h = getHeight();
         double mouseX = e.getX();
@@ -159,12 +198,14 @@ public class GraphPanel extends JPanel {
                 drawFunction(g2, pf, w, h, sX, sY);
             }
         }
-
+        if (!highlightedPoints.isEmpty()) {
+            drawHighlightedPoints(g2, w, h, sX, sY);
+        }
         drawLimitsInfo(g2);
     }
 
     private void drawHighlightedArea(Graphics2D g2, Function<Double, Double> func, double a, double b,
-                                     int w, int h, double sX, double sY) {
+            int w, int h, double sX, double sY) {
         int steps = 1000;
         double step = (b - a) / steps;
         int[] xPoints = new int[steps + 2];
@@ -207,9 +248,11 @@ public class GraphPanel extends JPanel {
         g2.setColor(Color.WHITE);
         g2.setStroke(new BasicStroke(2f));
         int y0 = h - (int) ((0 - yMin) * sY);
-        if (y0 >= 0 && y0 <= h) g2.drawLine(0, y0, w, y0);
+        if (y0 >= 0 && y0 <= h)
+            g2.drawLine(0, y0, w, y0);
         int x0 = (int) ((0 - xMin) * sX);
-        if (x0 >= 0 && x0 <= w) g2.drawLine(x0, 0, x0, h);
+        if (x0 >= 0 && x0 <= w)
+            g2.drawLine(x0, 0, x0, h);
     }
 
     private void drawLabels(Graphics2D g2, int w, int h, double sX, double sY) {
@@ -262,6 +305,67 @@ public class GraphPanel extends JPanel {
     private void drawLimitsInfo(Graphics2D g2) {
         g2.setColor(Color.CYAN);
         g2.setFont(new Font("Arial", Font.PLAIN, 12));
-        g2.drawString(String.format("Limits: X[%.2f, %.2f] Y[%.2f, %.2f]", xMin, xMax, yMin, yMax), 10, getHeight() - 10);
+        g2.drawString(String.format("Limits: X[%.2f, %.2f] Y[%.2f, %.2f]", xMin, xMax, yMin, yMax), 10,
+                getHeight() - 10);
+    }
+
+    private void drawHighlightedPoints(Graphics2D g2, int w, int h, double sX, double sY) {
+        highlightedPoints.forEach((point, type) -> {
+            // Set color and label based on EXACT type strings
+            Color pointColor;
+            String upperType = type.toUpperCase();
+            String label;
+
+            switch (upperType) {
+                case "MAX":
+                    pointColor = Color.RED;
+                    label = "M";
+                    break;
+                case "MIN":
+                    pointColor = Color.GREEN;
+                    label = "N";
+                    break;
+                case "INFLECTION":
+                    pointColor = Color.YELLOW;
+                    label = "I";
+                    break;
+                default:
+                    pointColor = Color.BLUE;
+                    label = "?";
+                    System.out.println("Unknown point type: " + type); // Debug
+            }
+
+            g2.setColor(pointColor);
+            int px = (int) ((point.x - xMin) * sX);
+            int py = h - (int) ((point.y - yMin) * sY);
+
+            if (px >= 0 && px <= w && py >= 0 && py <= h) {
+                int size = 8;
+                g2.fillOval(px - size / 2, py - size / 2, size, size);
+                g2.setColor(Color.WHITE);
+                g2.drawString(label, px + size, py - size);
+            }
+        });
+    }
+
+    public void displayExtremaResults(String results) {
+        JTextArea textArea = new JTextArea(results, 10, 30);
+        textArea.setEditable(false);
+        textArea.setLineWrap(true);
+        textArea.setWrapStyleWord(true);
+
+        // Custom styling
+        textArea.setBackground(new Color(30, 30, 30));
+        textArea.setForeground(Color.WHITE);
+        textArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
+
+        JScrollPane scrollPane = new JScrollPane(textArea);
+        scrollPane.setBorder(BorderFactory.createEmptyBorder());
+
+        JOptionPane.showMessageDialog(
+                this,
+                scrollPane,
+                "Extrema Results",
+                JOptionPane.PLAIN_MESSAGE);
     }
 }
