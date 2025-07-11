@@ -15,9 +15,11 @@ import java.io.Writer;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.function.Function;
 import javax.swing.*;
 import src.util.PlotFunction;
+import src.util.ExtremaFinder;
 
 public class GraphPanel extends JPanel {
     private List<PlotFunction> functions;
@@ -32,6 +34,9 @@ public class GraphPanel extends JPanel {
     private double highlightA = 0;
     private double highlightB = 0;
     private Map<Point2D, String> highlightedPoints = new HashMap<>();
+    
+    // Add extrema points field
+    private List<ExtremaFinder.ExtremaPoint> extremaPoints = new ArrayList<>();
 
     public GraphPanel() {
         this.setBackground(Color.BLACK);
@@ -81,6 +86,12 @@ public class GraphPanel extends JPanel {
 
     public void highlightCriticalPoints(Map<Point2D, String> points) {
         this.highlightedPoints = points;
+        repaint();
+    }
+
+    // Add method to display extrema
+    public void highlightExtrema(List<ExtremaFinder.ExtremaPoint> extrema) {
+        this.extremaPoints = extrema;
         repaint();
     }
 
@@ -180,13 +191,12 @@ public class GraphPanel extends JPanel {
 
         if (functions != null) {
             for (PlotFunction pf : functions) {
-                if (isStepFunction(pf)) {
-                    drawStepFunction(g2, pf, w, h, sX, sY);
-                } else {
-                    drawFunction(g2, pf, w, h, sX, sY);
-                }
+                drawFunction(g2, pf, w, h, sX, sY);
             }
         }
+
+        // Draw extrema points after drawing functions
+        drawExtremaPoints(g2, w, h, sX, sY);
 
         if (!highlightedPoints.isEmpty()) {
             drawCriticalPoints(g2, w, h, sX, sY);
@@ -199,47 +209,45 @@ public class GraphPanel extends JPanel {
         drawLimitsInfo(g2);
     }
 
-    // Check if function is a step function
-    private boolean isStepFunction(PlotFunction pf) {
-        return pf.getLabel().toLowerCase().contains("step");
-    }
-
-    // Specialized drawing method for step functions
-    private void drawStepFunction(Graphics2D g2, PlotFunction pf, int w, int h, double sX, double sY) {
-        g2.setColor(pf.getColor());
-        g2.setStroke(new BasicStroke(2f));
-
-        // Draw horizontal line segments for each integer interval
-        for (int i = (int) Math.floor(xMin); i <= (int) Math.ceil(xMax); i++) {
-            double stepValue = i; // The y-value for this step
+    // Add method to draw extrema points
+    private void drawExtremaPoints(Graphics2D g2, int w, int h, double sX, double sY) {
+        for (ExtremaFinder.ExtremaPoint extrema : extremaPoints) {
+            Point2D point = extrema.point;
             
-            // Define the x-range for this step: [i, i+1)
-            double xStart = Math.max(i, xMin);
-            double xEnd = Math.min(i + 1, xMax);
+            // Convert to screen coordinates
+            int px = (int) ((point.getX() - xMin) * sX);
+            int py = h - (int) ((point.getY() - yMin) * sY);
             
-            if (xStart < xEnd && stepValue >= yMin && stepValue <= yMax) {
-                // Convert to screen coordinates
-                int screenXStart = (int) ((xStart - xMin) * sX);
-                int screenXEnd = (int) ((xEnd - xMin) * sX);
-                int screenY = h - (int) ((stepValue - yMin) * sY);
-                
-                // Draw horizontal line segment
-                g2.drawLine(screenXStart, screenY, screenXEnd, screenY);
-                
-                // Draw closed circle at left endpoint (included)
-                if (i >= xMin && i <= xMax) {
-                    int screenXLeft = (int) ((i - xMin) * sX);
-                    g2.fillOval(screenXLeft - 3, screenY - 3, 6, 6);
+            // Only draw if visible
+            if (px >= 0 && px <= w && py >= 0 && py <= h) {
+                // Choose color based on type
+                Color color;
+                if (extrema.type.contains("Global Maximum")) {
+                    color = Color.RED;
+                } else if (extrema.type.contains("Global Minimum")) {
+                    color = Color.BLUE;
+                } else if (extrema.type.contains("Local Maximum")) {
+                    color = Color.ORANGE;
+                } else if (extrema.type.contains("Local Minimum")) {
+                    color = Color.CYAN;
+                } else {
+                    color = Color.YELLOW;
                 }
                 
-                // Draw open circle at right endpoint (excluded)
-                if (i + 1 >= xMin && i + 1 <= xMax && i + 1 < xMax) {
-                    int screenXRight = (int) ((i + 1 - xMin) * sX);
-                    g2.setColor(Color.BLACK);
-                    g2.fillOval(screenXRight - 3, screenY - 3, 6, 6);
-                    g2.setColor(pf.getColor());
-                    g2.drawOval(screenXRight - 3, screenY - 3, 6, 6);
-                }
+                // Draw the point
+                g2.setColor(color);
+                g2.fillOval(px - 5, py - 5, 10, 10);
+                
+                // Draw border
+                g2.setColor(Color.WHITE);
+                g2.setStroke(new BasicStroke(2f));
+                g2.drawOval(px - 5, py - 5, 10, 10);
+                
+                // Draw label
+                g2.setColor(Color.WHITE);
+                g2.setFont(new Font("Arial", Font.BOLD, 10));
+                String label = extrema.type.substring(0, Math.min(extrema.type.length(), 8));
+                g2.drawString(label, px + 8, py - 8);
             }
         }
     }
@@ -349,7 +357,6 @@ public class GraphPanel extends JPanel {
         }
     }
 
-    // Regular function drawing for non-step functions
     private void drawFunction(Graphics2D g2, PlotFunction pf, int w, int h, double sX, double sY) {
         g2.setColor(pf.getColor());
         g2.setStroke(new BasicStroke(2f));
@@ -388,6 +395,13 @@ public class GraphPanel extends JPanel {
         g2.setFont(new Font("Arial", Font.PLAIN, 12));
         g2.drawString(String.format("Limits: X[%.2f, %.2f] Y[%.2f, %.2f]", xMin, xMax, yMin, yMax), 
                      10, getHeight() - 10);
+        
+        // Show extrema count
+        if (!extremaPoints.isEmpty()) {
+            g2.setColor(Color.ORANGE);
+            g2.drawString(String.format("Extrema: %d", extremaPoints.size()), 
+                         10, getHeight() - 30);
+        }
     }
 
     public void exportToSVG(File file) {
