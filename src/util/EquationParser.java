@@ -91,13 +91,16 @@ public class EquationParser {
             int start = index;
             while (Character.isLetter(current())) consume();
             String name = expr.substring(start, index);
+
             if (name.equals("x")) return x;
             if (name.equals("pi")) return Math.PI;
             if (name.equals("e")) return Math.E;
+
             if (current() == '(') {
                 consume();
                 double arg = parseExpression();
                 if (current() == ')') consume();
+
                 switch (name) {
                     case "sin": return Math.sin(arg);
                     case "cos": return Math.cos(arg);
@@ -109,10 +112,16 @@ public class EquationParser {
                     case "log": return Math.log(arg);
                     case "sqrt": return Math.sqrt(arg);
                     case "exp": return Math.exp(arg);
+                    case "step": return stepFunction(arg);
                     default: throw new RuntimeException("Unknown function: " + name);
                 }
             }
             throw new RuntimeException("Unknown variable or function: " + name);
+        }
+
+        // Corrected Greatest Integer Function (Floor Function)
+        private double stepFunction(double x) {
+            return Math.floor(x);
         }
 
         char current() {

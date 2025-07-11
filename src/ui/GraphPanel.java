@@ -15,11 +15,9 @@ import java.io.Writer;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
-import java.util.ArrayList;
 import java.util.function.Function;
 import javax.swing.*;
 import src.util.PlotFunction;
-import src.util.IntersectionSolver;
 
 public class GraphPanel extends JPanel {
     private List<PlotFunction> functions;
@@ -34,9 +32,6 @@ public class GraphPanel extends JPanel {
     private double highlightA = 0;
     private double highlightB = 0;
     private Map<Point2D, String> highlightedPoints = new HashMap<>();
-    
-    // Intersection points storage
-    private List<IntersectionSolver.IntersectionPoint> intersectionPoints = new ArrayList<>();
 
     public GraphPanel() {
         this.setBackground(Color.BLACK);
@@ -44,30 +39,18 @@ public class GraphPanel extends JPanel {
         ToolTipManager.sharedInstance().registerComponent(this);
         this.setToolTipText("");
         
-        // Enhanced mouse listener for intersection detection
         this.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
-                tooltipText = getPointInfoText(e);
+                tooltipText = getFunctionPointText(e);
                 setToolTipText(tooltipText);
                 ToolTipManager.sharedInstance().mouseMoved(e);
-            }
-        });
-        
-        // Add mouse motion listener for real-time hover detection
-        this.addMouseMotionListener(new MouseMotionAdapter() {
-            @Override
-            public void mouseMoved(MouseEvent e) {
-                String hoverText = getPointInfoText(e);
-                setToolTipText(hoverText);
-                repaint();
             }
         });
     }
 
     public void setFunctions(List<PlotFunction> funcs) {
         this.functions = funcs;
-        calculateIntersections();
         repaint();
     }
 
@@ -101,22 +84,6 @@ public class GraphPanel extends JPanel {
         repaint();
     }
 
-    // Calculate all intersections between functions
-    private void calculateIntersections() {
-        intersectionPoints.clear();
-        if (functions == null || functions.size() < 2) {
-            return;
-        }
-
-        for (int i = 0; i < functions.size(); i++) {
-            for (int j = i + 1; j < functions.size(); j++) {
-                List<IntersectionSolver.IntersectionPoint> intersections = 
-                    IntersectionSolver.findAllIntersections(functions.get(i), functions.get(j), xMin, xMax);
-                intersectionPoints.addAll(intersections);
-            }
-        }
-    }
-
     private void initPanZoomListeners() {
         this.addMouseWheelListener(new MouseWheelListener() {
             @Override
@@ -135,7 +102,6 @@ public class GraphPanel extends JPanel {
                 xMax = xMin + newWidth;
                 yMax = worldY + (mouseY / h) * newHeight;
                 yMin = yMax - newHeight;
-                calculateIntersections(); // Recalculate intersections after zoom
                 repaint();
             }
         });
@@ -163,7 +129,6 @@ public class GraphPanel extends JPanel {
                 yMax += worldDY;
                 lastMouseX = x;
                 lastMouseY = y;
-                calculateIntersections(); // Recalculate intersections after pan
                 repaint();
             }
         };
@@ -171,53 +136,31 @@ public class GraphPanel extends JPanel {
         this.addMouseMotionListener(ma);
     }
 
-    // Enhanced method to get point information including intersections with coordinates
-    private String getPointInfoText(MouseEvent e) {
+    private String getFunctionPointText(MouseEvent e) {
         if (functions == null || functions.isEmpty()) return null;
-
+        
         int w = getWidth();
         int h = getHeight();
         double mouseX = e.getX();
         double mouseY = e.getY();
         double worldX = xMin + mouseX * (xMax - xMin) / w;
-        double worldY = yMax - mouseY * (yMax - yMin) / h;
-
-        final int tolerance = 8;
-
-        // First check for intersection points
-        for (IntersectionSolver.IntersectionPoint intersection : intersectionPoints) {
-            Point2D point = intersection.point;
-            double screenX = (point.getX() - xMin) * w / (xMax - xMin);
-            double screenY = h - (point.getY() - yMin) * h / (yMax - yMin);
-            
-            double distance = Math.sqrt(Math.pow(screenX - mouseX, 2) + Math.pow(screenY - mouseY, 2));
-            
-            if (distance <= tolerance) {
-                return String.format("<html><b>Intersection Point</b><br><b>X: %.4f</b><br><b>Y: %.4f</b><br>Between: %s<br>and: %s</html>", 
-                    point.getX(), point.getY(), 
-                    intersection.function1Name, 
-                    intersection.function2Name);
-            }
-        }
-
-        // Then check for regular function points
+        
+        final int tol = 5;
         for (PlotFunction pf : functions) {
             double y = pf.getFunction().apply(worldX);
             if (Double.isFinite(y)) {
                 double screenY = h - (y - yMin) * h / (yMax - yMin);
-                if (Math.abs(screenY - mouseY) <= tolerance) {
-                    return String.format("<html><b>Function Point</b><br><b>X: %.4f</b><br><b>Y: %.4f</b><br>Function: %s</html>", 
-                        worldX, y, pf.getLabel());
+                if (Math.abs(screenY - mouseY) <= tol) {
+                    return String.format("(%.3f, %.3f)", worldX, y);
                 }
             }
         }
-
         return null;
     }
 
     @Override
     public String getToolTipText(MouseEvent e) {
-        return getPointInfoText(e);
+        return tooltipText;
     }
 
     @Override
@@ -237,12 +180,13 @@ public class GraphPanel extends JPanel {
 
         if (functions != null) {
             for (PlotFunction pf : functions) {
-                drawFunction(g2, pf, w, h, sX, sY);
+                if (isStepFunction(pf)) {
+                    drawStepFunction(g2, pf, w, h, sX, sY);
+                } else {
+                    drawFunction(g2, pf, w, h, sX, sY);
+                }
             }
         }
-
-        // Draw intersection points
-        drawIntersectionPoints(g2, w, h, sX, sY);
 
         if (!highlightedPoints.isEmpty()) {
             drawCriticalPoints(g2, w, h, sX, sY);
@@ -255,31 +199,47 @@ public class GraphPanel extends JPanel {
         drawLimitsInfo(g2);
     }
 
-    // Modified method to draw smaller intersection points
-    private void drawIntersectionPoints(Graphics2D g2, int w, int h, double sX, double sY) {
-        for (IntersectionSolver.IntersectionPoint intersection : intersectionPoints) {
-            Point2D point = intersection.point;
+    // Check if function is a step function
+    private boolean isStepFunction(PlotFunction pf) {
+        return pf.getLabel().toLowerCase().contains("step");
+    }
+
+    // Specialized drawing method for step functions
+    private void drawStepFunction(Graphics2D g2, PlotFunction pf, int w, int h, double sX, double sY) {
+        g2.setColor(pf.getColor());
+        g2.setStroke(new BasicStroke(2f));
+
+        // Draw horizontal line segments for each integer interval
+        for (int i = (int) Math.floor(xMin); i <= (int) Math.ceil(xMax); i++) {
+            double stepValue = i; // The y-value for this step
             
-            // Convert world coordinates to screen coordinates
-            int px = (int) ((point.getX() - xMin) * sX);
-            int py = h - (int) ((point.getY() - yMin) * sY);
+            // Define the x-range for this step: [i, i+1)
+            double xStart = Math.max(i, xMin);
+            double xEnd = Math.min(i + 1, xMax);
             
-            // Only draw if the point is visible on screen
-            if (px >= 0 && px <= w && py >= 0 && py <= h) {
-                // Draw a smaller highlighted circle for intersection points (reduced from 12px to 8px)
-                g2.setColor(Color.YELLOW);
-                g2.setStroke(new BasicStroke(2f));
-                g2.fillOval(px - 4, py - 4, 8, 8);
+            if (xStart < xEnd && stepValue >= yMin && stepValue <= yMax) {
+                // Convert to screen coordinates
+                int screenXStart = (int) ((xStart - xMin) * sX);
+                int screenXEnd = (int) ((xEnd - xMin) * sX);
+                int screenY = h - (int) ((stepValue - yMin) * sY);
                 
-                // Draw border
-                g2.setColor(Color.RED);
-                g2.drawOval(px - 4, py - 4, 8, 8);
+                // Draw horizontal line segment
+                g2.drawLine(screenXStart, screenY, screenXEnd, screenY);
                 
-                // Draw a small cross in the center
-                g2.setColor(Color.BLACK);
-                g2.setStroke(new BasicStroke(1f));
-                g2.drawLine(px - 2, py, px + 2, py);
-                g2.drawLine(px, py - 2, px, py + 2);
+                // Draw closed circle at left endpoint (included)
+                if (i >= xMin && i <= xMax) {
+                    int screenXLeft = (int) ((i - xMin) * sX);
+                    g2.fillOval(screenXLeft - 3, screenY - 3, 6, 6);
+                }
+                
+                // Draw open circle at right endpoint (excluded)
+                if (i + 1 >= xMin && i + 1 <= xMax && i + 1 < xMax) {
+                    int screenXRight = (int) ((i + 1 - xMin) * sX);
+                    g2.setColor(Color.BLACK);
+                    g2.fillOval(screenXRight - 3, screenY - 3, 6, 6);
+                    g2.setColor(pf.getColor());
+                    g2.drawOval(screenXRight - 3, screenY - 3, 6, 6);
+                }
             }
         }
     }
@@ -389,6 +349,7 @@ public class GraphPanel extends JPanel {
         }
     }
 
+    // Regular function drawing for non-step functions
     private void drawFunction(Graphics2D g2, PlotFunction pf, int w, int h, double sX, double sY) {
         g2.setColor(pf.getColor());
         g2.setStroke(new BasicStroke(2f));
@@ -427,13 +388,6 @@ public class GraphPanel extends JPanel {
         g2.setFont(new Font("Arial", Font.PLAIN, 12));
         g2.drawString(String.format("Limits: X[%.2f, %.2f] Y[%.2f, %.2f]", xMin, xMax, yMin, yMax), 
                      10, getHeight() - 10);
-        
-        // Show intersection count
-        if (!intersectionPoints.isEmpty()) {
-            g2.setColor(Color.YELLOW);
-            g2.drawString(String.format("Intersections: %d", intersectionPoints.size()), 
-                         10, getHeight() - 30);
-        }
     }
 
     public void exportToSVG(File file) {
