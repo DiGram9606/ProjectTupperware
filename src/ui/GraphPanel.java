@@ -7,26 +7,17 @@ import org.w3c.dom.Document;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.geom.Path2D;
-<<<<<<< HEAD
-import java.util.ArrayList;
-import java.util.List;
-import java.util.function.Function;
-=======
+import java.awt.geom.Point2D;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.util.List;
-import java.util.function.Function;
-import javax.swing.*;
->>>>>>> b4646251617d6a5080d0cffff3c78e4299ebc9f3
-
-import src.util.PlotFunction;
-
-import javax.swing.*;
 import java.util.Map;
 import java.util.HashMap;
-import java.awt.geom.Point2D;
+import java.util.function.Function;
+import javax.swing.*;
+import src.util.PlotFunction;
 
 public class GraphPanel extends JPanel {
     private List<PlotFunction> functions;
@@ -34,18 +25,13 @@ public class GraphPanel extends JPanel {
     private double xMax = 10.0;
     private double yMin = -10.0;
     private double yMax = 10.0;
-
     private int lastMouseX;
     private int lastMouseY;
     private String tooltipText = null;
-
     private Function<Double, Double> highlightedFunc = null;
     private double highlightA = 0;
     private double highlightB = 0;
-
-    // private List<Point2D.Double> highlightedPoints = new ArrayList<>();
-    private Map<Point2D.Double, String> highlightedPoints = new HashMap<>();
-    private JTextArea resultsArea;
+    private Map<Point2D, String> highlightedPoints = new HashMap<>();
 
     public GraphPanel() {
         this.setBackground(Color.BLACK);
@@ -75,33 +61,6 @@ public class GraphPanel extends JPanel {
         repaint();
     }
 
-<<<<<<< HEAD
-    public void displayCriticalPointsResults(String results) {
-        SwingUtilities.invokeLater(() -> {
-            JTextArea textArea = new JTextArea(results);
-            textArea.setEditable(false);
-            textArea.setLineWrap(true);
-            textArea.setWrapStyleWord(true);
-            textArea.setBackground(new Color(30, 30, 30));
-            textArea.setForeground(Color.WHITE);
-            textArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
-
-            JScrollPane scrollPane = new JScrollPane(textArea);
-            scrollPane.setPreferredSize(new Dimension(350, 150));
-
-            JOptionPane.showMessageDialog(
-                    this,
-                    scrollPane,
-                    "Critical Points Analysis",
-                    JOptionPane.INFORMATION_MESSAGE);
-        });
-    }
-
-    public void highlightAreaUnder(Function<Double, Double> f, double a, double b) {
-        this.areaFunction = f;
-        this.areaA = a;
-        this.areaB = b;
-=======
     public void highlightAreaUnder(Function<Double, Double> func, double a, double b) {
         this.highlightedFunc = func;
         this.highlightA = a;
@@ -111,15 +70,16 @@ public class GraphPanel extends JPanel {
 
     public void clearHighlight() {
         this.highlightedFunc = null;
->>>>>>> b4646251617d6a5080d0cffff3c78e4299ebc9f3
+        this.highlightedPoints.clear();
         repaint();
     }
 
-    public void highlightPoints(List<Point2D.Double> points, List<String> types) {
-        highlightedPoints.clear();
-        for (int i = 0; i < points.size(); i++) {
-            highlightedPoints.put(points.get(i), types.get(i));
-        }
+    public void displayCriticalPointsResults(String results) {
+        JOptionPane.showMessageDialog(this, results, "Critical Points Analysis", JOptionPane.INFORMATION_MESSAGE);
+    }
+
+    public void highlightCriticalPoints(Map<Point2D, String> points) {
+        this.highlightedPoints = points;
         repaint();
     }
 
@@ -176,8 +136,7 @@ public class GraphPanel extends JPanel {
     }
 
     private String getFunctionPointText(MouseEvent e) {
-        if (functions == null || functions.isEmpty())
-            return null;
+        if (functions == null || functions.isEmpty()) return null;
         int w = getWidth();
         int h = getHeight();
         double mouseX = e.getX();
@@ -210,6 +169,7 @@ public class GraphPanel extends JPanel {
         int h = getHeight();
         double sX = w / (xMax - xMin);
         double sY = h / (yMax - yMin);
+
         drawGrid(g2, w, h, sX, sY);
         drawAxes(g2, w, h, sX, sY);
         drawLabels(g2, w, h, sX, sY);
@@ -219,21 +179,13 @@ public class GraphPanel extends JPanel {
                 drawFunction(g2, pf, w, h, sX, sY);
             }
         }
-<<<<<<< HEAD
+
+        // Draw highlighted critical points
         if (!highlightedPoints.isEmpty()) {
-            drawHighlightedPoints(g2, w, h, sX, sY);
+            drawCriticalPoints(g2, w, h, sX, sY);
         }
-        drawLimitsInfo(g2);
-    }
 
-    private void drawHighlightedArea(Graphics2D g2, Function<Double, Double> func, double a, double b,
-            int w, int h, double sX, double sY) {
-        int steps = 1000;
-        double step = (b - a) / steps;
-        int[] xPoints = new int[steps + 2];
-        int[] yPoints = new int[steps + 2];
-=======
-
+        // Draw highlighted area
         if (highlightedFunc != null) {
             drawHighlightedArea(g2, w, h, sX, sY);
         }
@@ -241,12 +193,35 @@ public class GraphPanel extends JPanel {
         drawLimitsInfo(g2);
     }
 
+    private void drawCriticalPoints(Graphics2D g2, int w, int h, double sX, double sY) {
+        g2.setStroke(new BasicStroke(3f));
+        for (Map.Entry<Point2D, String> entry : highlightedPoints.entrySet()) {
+            Point2D point = entry.getKey();
+            String type = entry.getValue();
+            
+            int px = (int) ((point.getX() - xMin) * sX);
+            int py = h - (int) ((point.getY() - yMin) * sY);
+            
+            // Set color based on type
+            if (type.contains("Maximum")) {
+                g2.setColor(Color.RED);
+            } else if (type.contains("Minimum")) {
+                g2.setColor(Color.GREEN);
+            } else {
+                g2.setColor(Color.YELLOW);
+            }
+            
+            // Draw point
+            g2.fillOval(px - 4, py - 4, 8, 8);
+            g2.setColor(Color.WHITE);
+            g2.drawOval(px - 4, py - 4, 8, 8);
+        }
+    }
+
     private void drawHighlightedArea(Graphics2D g2, int w, int h, double sX, double sY) {
         Path2D.Double path = new Path2D.Double();
         boolean started = false;
         double step = (xMax - xMin) / w;
->>>>>>> b4646251617d6a5080d0cffff3c78e4299ebc9f3
-
         for (double x = highlightA; x <= highlightB; x += step) {
             double y = highlightedFunc.apply(x);
             if (Double.isFinite(y)) {
@@ -260,14 +235,12 @@ public class GraphPanel extends JPanel {
                 }
             }
         }
-
         int endX = (int) ((highlightB - xMin) * sX);
         int startX = (int) ((highlightA - xMin) * sX);
         int baseY = h - (int) ((0 - yMin) * sY);
         path.lineTo(endX, baseY);
         path.lineTo(startX, baseY);
         path.closePath();
-
         g2.setColor(new Color(255, 255, 0, 100));
         g2.fill(path);
     }
@@ -289,11 +262,9 @@ public class GraphPanel extends JPanel {
         g2.setColor(Color.WHITE);
         g2.setStroke(new BasicStroke(2f));
         int y0 = h - (int) ((0 - yMin) * sY);
-        if (y0 >= 0 && y0 <= h)
-            g2.drawLine(0, y0, w, y0);
+        if (y0 >= 0 && y0 <= h) g2.drawLine(0, y0, w, y0);
         int x0 = (int) ((0 - xMin) * sX);
-        if (x0 >= 0 && x0 <= w)
-            g2.drawLine(x0, 0, x0, h);
+        if (x0 >= 0 && x0 <= w) g2.drawLine(x0, 0, x0, h);
     }
 
     private void drawLabels(Graphics2D g2, int w, int h, double sX, double sY) {
@@ -346,93 +317,25 @@ public class GraphPanel extends JPanel {
     private void drawLimitsInfo(Graphics2D g2) {
         g2.setColor(Color.CYAN);
         g2.setFont(new Font("Arial", Font.PLAIN, 12));
-        g2.drawString(String.format("Limits: X[%.2f, %.2f] Y[%.2f, %.2f]", xMin, xMax, yMin, yMax), 10,
-                getHeight() - 10);
+        g2.drawString(String.format("Limits: X[%.2f, %.2f] Y[%.2f, %.2f]", xMin, xMax, yMin, yMax), 10, getHeight() - 10);
     }
 
-    private void drawHighlightedPoints(Graphics2D g2, int w, int h, double sX, double sY) {
-        highlightedPoints.forEach((point, type) -> {
-            // Set color and label based on EXACT type strings
-            Color pointColor;
-            String upperType = type.toUpperCase();
-            String label;
-
-            switch (upperType) {
-                case "MAX":
-                    pointColor = Color.RED;
-                    label = "M";
-                    break;
-                case "MIN":
-                    pointColor = Color.GREEN;
-                    label = "N";
-                    break;
-                case "INFLECTION":
-                    pointColor = Color.YELLOW;
-                    label = "I";
-                    break;
-                default:
-                    pointColor = Color.BLUE;
-                    label = "?";
-                    System.out.println("Unknown point type: " + type); // Debug
+    public void exportToSVG(File file) {
+        try {
+            System.out.println("GraphPanel size: " + this.getWidth() + " x " + this.getHeight());
+            DOMImplementation domImpl = GenericDOMImplementation.getDOMImplementation();
+            String svgNS = "http://www.w3.org/2000/svg";
+            Document document = domImpl.createDocument(svgNS, "svg", null);
+            SVGGraphics2D svgGenerator = new SVGGraphics2D(document);
+            svgGenerator.setSVGCanvasSize(new java.awt.Dimension(this.getWidth(), this.getHeight()));
+            this.paint(svgGenerator);
+            boolean useCSS = true;
+            try (Writer out = new OutputStreamWriter(new FileOutputStream(file), "UTF-8")) {
+                svgGenerator.stream(out, useCSS);
             }
-
-            g2.setColor(pointColor);
-            int px = (int) ((point.x - xMin) * sX);
-            int py = h - (int) ((point.y - yMin) * sY);
-
-            if (px >= 0 && px <= w && py >= 0 && py <= h) {
-                int size = 8;
-                g2.fillOval(px - size / 2, py - size / 2, size, size);
-                g2.setColor(Color.WHITE);
-                g2.drawString(label, px + size, py - size);
-            }
-        });
-    }
-
-    public void displayExtremaResults(String results) {
-        JTextArea textArea = new JTextArea(results, 10, 30);
-        textArea.setEditable(false);
-        textArea.setLineWrap(true);
-        textArea.setWrapStyleWord(true);
-
-        // Custom styling
-        textArea.setBackground(new Color(30, 30, 30));
-        textArea.setForeground(Color.WHITE);
-        textArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
-
-        JScrollPane scrollPane = new JScrollPane(textArea);
-        scrollPane.setBorder(BorderFactory.createEmptyBorder());
-
-        JOptionPane.showMessageDialog(
-                this,
-                scrollPane,
-                "Extrema Results",
-                JOptionPane.PLAIN_MESSAGE);
-    }
-
-   public void exportToSVG(File file) {
-    try {
-        System.out.println("GraphPanel size: " + this.getWidth() + " x " + this.getHeight());
-
-        DOMImplementation domImpl = GenericDOMImplementation.getDOMImplementation();
-        String svgNS = "http://www.w3.org/2000/svg";
-        Document document = domImpl.createDocument(svgNS, "svg", null);
-
-        SVGGraphics2D svgGenerator = new SVGGraphics2D(document);
-        svgGenerator.setSVGCanvasSize(new java.awt.Dimension(this.getWidth(), this.getHeight()));
-
-        this.paint(svgGenerator); // Render your graph
-
-        boolean useCSS = true;
-        try (Writer out = new OutputStreamWriter(new FileOutputStream(file), "UTF-8")) {
-            svgGenerator.stream(out, useCSS);
+            System.out.println("Export complete. Saved to: " + file.getAbsolutePath());
+        } catch (Exception e) {
+            e.printStackTrace();
         }
-
-        System.out.println("Export complete. Saved to: " + file.getAbsolutePath());
-
-    } catch (Exception e) {
-        e.printStackTrace();
     }
-}
-   
 }
