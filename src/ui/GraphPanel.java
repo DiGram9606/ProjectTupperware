@@ -1,11 +1,25 @@
 package src.ui;
 
+import org.apache.batik.svggen.SVGGraphics2D;
+import org.apache.batik.dom.GenericDOMImplementation;
+import org.w3c.dom.DOMImplementation;
+import org.w3c.dom.Document;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.geom.Path2D;
+<<<<<<< HEAD
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
+=======
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
+import java.util.List;
+import java.util.function.Function;
+import javax.swing.*;
+>>>>>>> b4646251617d6a5080d0cffff3c78e4299ebc9f3
 
 import src.util.PlotFunction;
 
@@ -25,9 +39,9 @@ public class GraphPanel extends JPanel {
     private int lastMouseY;
     private String tooltipText = null;
 
-    // Area highlight fields
-    private Function<Double, Double> areaFunction = null;
-    private double areaA = 0, areaB = 0;
+    private Function<Double, Double> highlightedFunc = null;
+    private double highlightA = 0;
+    private double highlightB = 0;
 
     // private List<Point2D.Double> highlightedPoints = new ArrayList<>();
     private Map<Point2D.Double, String> highlightedPoints = new HashMap<>();
@@ -61,6 +75,7 @@ public class GraphPanel extends JPanel {
         repaint();
     }
 
+<<<<<<< HEAD
     public void displayCriticalPointsResults(String results) {
         SwingUtilities.invokeLater(() -> {
             JTextArea textArea = new JTextArea(results);
@@ -86,6 +101,17 @@ public class GraphPanel extends JPanel {
         this.areaFunction = f;
         this.areaA = a;
         this.areaB = b;
+=======
+    public void highlightAreaUnder(Function<Double, Double> func, double a, double b) {
+        this.highlightedFunc = func;
+        this.highlightA = a;
+        this.highlightB = b;
+        repaint();
+    }
+
+    public void clearHighlight() {
+        this.highlightedFunc = null;
+>>>>>>> b4646251617d6a5080d0cffff3c78e4299ebc9f3
         repaint();
     }
 
@@ -184,20 +210,16 @@ public class GraphPanel extends JPanel {
         int h = getHeight();
         double sX = w / (xMax - xMin);
         double sY = h / (yMax - yMin);
-
         drawGrid(g2, w, h, sX, sY);
         drawAxes(g2, w, h, sX, sY);
         drawLabels(g2, w, h, sX, sY);
-
-        if (areaFunction != null) {
-            drawHighlightedArea(g2, areaFunction, areaA, areaB, w, h, sX, sY);
-        }
 
         if (functions != null) {
             for (PlotFunction pf : functions) {
                 drawFunction(g2, pf, w, h, sX, sY);
             }
         }
+<<<<<<< HEAD
         if (!highlightedPoints.isEmpty()) {
             drawHighlightedPoints(g2, w, h, sX, sY);
         }
@@ -210,25 +232,44 @@ public class GraphPanel extends JPanel {
         double step = (b - a) / steps;
         int[] xPoints = new int[steps + 2];
         int[] yPoints = new int[steps + 2];
+=======
 
-        for (int i = 0; i <= steps; i++) {
-            double x = a + i * step;
-            double y = func.apply(x);
-            int px = (int) ((x - xMin) * sX);
-            int py = h - (int) ((y - yMin) * sY);
-            xPoints[i] = px;
-            yPoints[i] = py;
+        if (highlightedFunc != null) {
+            drawHighlightedArea(g2, w, h, sX, sY);
         }
 
-        // Close the polygon to x-axis
-        xPoints[steps + 1] = (int) ((b - xMin) * sX);
-        yPoints[steps + 1] = h - (int) ((0 - yMin) * sY);
+        drawLimitsInfo(g2);
+    }
 
-        xPoints[0] = (int) ((a - xMin) * sX);
-        yPoints[0] = h - (int) ((0 - yMin) * sY);
+    private void drawHighlightedArea(Graphics2D g2, int w, int h, double sX, double sY) {
+        Path2D.Double path = new Path2D.Double();
+        boolean started = false;
+        double step = (xMax - xMin) / w;
+>>>>>>> b4646251617d6a5080d0cffff3c78e4299ebc9f3
 
-        g2.setColor(new Color(255, 165, 0, 100)); // translucent orange
-        g2.fillPolygon(xPoints, yPoints, steps + 2);
+        for (double x = highlightA; x <= highlightB; x += step) {
+            double y = highlightedFunc.apply(x);
+            if (Double.isFinite(y)) {
+                int px = (int) ((x - xMin) * sX);
+                int py = h - (int) ((y - yMin) * sY);
+                if (!started) {
+                    path.moveTo(px, py);
+                    started = true;
+                } else {
+                    path.lineTo(px, py);
+                }
+            }
+        }
+
+        int endX = (int) ((highlightB - xMin) * sX);
+        int startX = (int) ((highlightA - xMin) * sX);
+        int baseY = h - (int) ((0 - yMin) * sY);
+        path.lineTo(endX, baseY);
+        path.lineTo(startX, baseY);
+        path.closePath();
+
+        g2.setColor(new Color(255, 255, 0, 100));
+        g2.fill(path);
     }
 
     private void drawGrid(Graphics2D g2, int w, int h, double sX, double sY) {
@@ -368,4 +409,30 @@ public class GraphPanel extends JPanel {
                 "Extrema Results",
                 JOptionPane.PLAIN_MESSAGE);
     }
+
+   public void exportToSVG(File file) {
+    try {
+        System.out.println("GraphPanel size: " + this.getWidth() + " x " + this.getHeight());
+
+        DOMImplementation domImpl = GenericDOMImplementation.getDOMImplementation();
+        String svgNS = "http://www.w3.org/2000/svg";
+        Document document = domImpl.createDocument(svgNS, "svg", null);
+
+        SVGGraphics2D svgGenerator = new SVGGraphics2D(document);
+        svgGenerator.setSVGCanvasSize(new java.awt.Dimension(this.getWidth(), this.getHeight()));
+
+        this.paint(svgGenerator); // Render your graph
+
+        boolean useCSS = true;
+        try (Writer out = new OutputStreamWriter(new FileOutputStream(file), "UTF-8")) {
+            svgGenerator.stream(out, useCSS);
+        }
+
+        System.out.println("Export complete. Saved to: " + file.getAbsolutePath());
+
+    } catch (Exception e) {
+        e.printStackTrace();
+    }
+}
+   
 }
