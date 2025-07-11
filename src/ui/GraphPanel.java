@@ -15,9 +15,11 @@ import java.io.Writer;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.function.Function;
 import javax.swing.*;
 import src.util.PlotFunction;
+import src.util.IntersectionSolver;
 
 public class GraphPanel extends JPanel {
     private List<PlotFunction> functions;
@@ -32,24 +34,40 @@ public class GraphPanel extends JPanel {
     private double highlightA = 0;
     private double highlightB = 0;
     private Map<Point2D, String> highlightedPoints = new HashMap<>();
+    
+    // Intersection points storage
+    private List<IntersectionSolver.IntersectionPoint> intersectionPoints = new ArrayList<>();
 
     public GraphPanel() {
         this.setBackground(Color.BLACK);
         initPanZoomListeners();
         ToolTipManager.sharedInstance().registerComponent(this);
         this.setToolTipText("");
+        
+        // Enhanced mouse listener for intersection detection
         this.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
-                tooltipText = getFunctionPointText(e);
+                tooltipText = getPointInfoText(e);
                 setToolTipText(tooltipText);
                 ToolTipManager.sharedInstance().mouseMoved(e);
+            }
+        });
+        
+        // Add mouse motion listener for real-time hover detection
+        this.addMouseMotionListener(new MouseMotionAdapter() {
+            @Override
+            public void mouseMoved(MouseEvent e) {
+                String hoverText = getPointInfoText(e);
+                setToolTipText(hoverText);
+                repaint();
             }
         });
     }
 
     public void setFunctions(List<PlotFunction> funcs) {
         this.functions = funcs;
+        calculateIntersections();
         repaint();
     }
 
@@ -83,6 +101,22 @@ public class GraphPanel extends JPanel {
         repaint();
     }
 
+    // Calculate all intersections between functions
+    private void calculateIntersections() {
+        intersectionPoints.clear();
+        if (functions == null || functions.size() < 2) {
+            return;
+        }
+
+        for (int i = 0; i < functions.size(); i++) {
+            for (int j = i + 1; j < functions.size(); j++) {
+                List<IntersectionSolver.IntersectionPoint> intersections = 
+                    IntersectionSolver.findAllIntersections(functions.get(i), functions.get(j), xMin, xMax);
+                intersectionPoints.addAll(intersections);
+            }
+        }
+    }
+
     private void initPanZoomListeners() {
         this.addMouseWheelListener(new MouseWheelListener() {
             @Override
@@ -101,9 +135,11 @@ public class GraphPanel extends JPanel {
                 xMax = xMin + newWidth;
                 yMax = worldY + (mouseY / h) * newHeight;
                 yMin = yMax - newHeight;
+                calculateIntersections(); // Recalculate intersections after zoom
                 repaint();
             }
         });
+
         MouseAdapter ma = new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
@@ -127,6 +163,7 @@ public class GraphPanel extends JPanel {
                 yMax += worldDY;
                 lastMouseX = x;
                 lastMouseY = y;
+                calculateIntersections(); // Recalculate intersections after pan
                 repaint();
             }
         };
@@ -134,29 +171,53 @@ public class GraphPanel extends JPanel {
         this.addMouseMotionListener(ma);
     }
 
-    private String getFunctionPointText(MouseEvent e) {
+    // Enhanced method to get point information including intersections with coordinates
+    private String getPointInfoText(MouseEvent e) {
         if (functions == null || functions.isEmpty()) return null;
+
         int w = getWidth();
         int h = getHeight();
         double mouseX = e.getX();
         double mouseY = e.getY();
         double worldX = xMin + mouseX * (xMax - xMin) / w;
-        final int tol = 5;
+        double worldY = yMax - mouseY * (yMax - yMin) / h;
+
+        final int tolerance = 8;
+
+        // First check for intersection points
+        for (IntersectionSolver.IntersectionPoint intersection : intersectionPoints) {
+            Point2D point = intersection.point;
+            double screenX = (point.getX() - xMin) * w / (xMax - xMin);
+            double screenY = h - (point.getY() - yMin) * h / (yMax - yMin);
+            
+            double distance = Math.sqrt(Math.pow(screenX - mouseX, 2) + Math.pow(screenY - mouseY, 2));
+            
+            if (distance <= tolerance) {
+                return String.format("<html><b>Intersection Point</b><br><b>X: %.4f</b><br><b>Y: %.4f</b><br>Between: %s<br>and: %s</html>", 
+                    point.getX(), point.getY(), 
+                    intersection.function1Name, 
+                    intersection.function2Name);
+            }
+        }
+
+        // Then check for regular function points
         for (PlotFunction pf : functions) {
             double y = pf.getFunction().apply(worldX);
             if (Double.isFinite(y)) {
                 double screenY = h - (y - yMin) * h / (yMax - yMin);
-                if (Math.abs(screenY - mouseY) <= tol) {
-                    return String.format("(%.3f, %.3f)", worldX, y);
+                if (Math.abs(screenY - mouseY) <= tolerance) {
+                    return String.format("<html><b>Function Point</b><br><b>X: %.4f</b><br><b>Y: %.4f</b><br>Function: %s</html>", 
+                        worldX, y, pf.getLabel());
                 }
             }
         }
+
         return null;
     }
 
     @Override
     public String getToolTipText(MouseEvent e) {
-        return tooltipText;
+        return getPointInfoText(e);
     }
 
     @Override
@@ -164,25 +225,63 @@ public class GraphPanel extends JPanel {
         super.paintComponent(g);
         Graphics2D g2 = (Graphics2D) g;
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
         int w = getWidth();
         int h = getHeight();
         double sX = w / (xMax - xMin);
         double sY = h / (yMax - yMin);
+
         drawGrid(g2, w, h, sX, sY);
         drawAxes(g2, w, h, sX, sY);
         drawLabels(g2, w, h, sX, sY);
+
         if (functions != null) {
             for (PlotFunction pf : functions) {
                 drawFunction(g2, pf, w, h, sX, sY);
             }
         }
+
+        // Draw intersection points
+        drawIntersectionPoints(g2, w, h, sX, sY);
+
         if (!highlightedPoints.isEmpty()) {
             drawCriticalPoints(g2, w, h, sX, sY);
         }
+
         if (highlightedFunc != null) {
             drawHighlightedArea(g2, w, h, sX, sY);
         }
+
         drawLimitsInfo(g2);
+    }
+
+    // Modified method to draw smaller intersection points
+    private void drawIntersectionPoints(Graphics2D g2, int w, int h, double sX, double sY) {
+        for (IntersectionSolver.IntersectionPoint intersection : intersectionPoints) {
+            Point2D point = intersection.point;
+            
+            // Convert world coordinates to screen coordinates
+            int px = (int) ((point.getX() - xMin) * sX);
+            int py = h - (int) ((point.getY() - yMin) * sY);
+            
+            // Only draw if the point is visible on screen
+            if (px >= 0 && px <= w && py >= 0 && py <= h) {
+                // Draw a smaller highlighted circle for intersection points (reduced from 12px to 8px)
+                g2.setColor(Color.YELLOW);
+                g2.setStroke(new BasicStroke(2f));
+                g2.fillOval(px - 4, py - 4, 8, 8);
+                
+                // Draw border
+                g2.setColor(Color.RED);
+                g2.drawOval(px - 4, py - 4, 8, 8);
+                
+                // Draw a small cross in the center
+                g2.setColor(Color.BLACK);
+                g2.setStroke(new BasicStroke(1f));
+                g2.drawLine(px - 2, py, px + 2, py);
+                g2.drawLine(px, py - 2, px, py + 2);
+            }
+        }
     }
 
     private void drawCriticalPoints(Graphics2D g2, int w, int h, double sX, double sY) {
@@ -192,6 +291,7 @@ public class GraphPanel extends JPanel {
             String type = entry.getValue();
             int px = (int) ((point.getX() - xMin) * sX);
             int py = h - (int) ((point.getY() - yMin) * sY);
+
             if (type.contains("Maximum")) {
                 g2.setColor(Color.RED);
             } else if (type.contains("Minimum")) {
@@ -199,6 +299,7 @@ public class GraphPanel extends JPanel {
             } else {
                 g2.setColor(Color.YELLOW);
             }
+
             g2.fillOval(px - 4, py - 4, 8, 8);
             g2.setColor(Color.WHITE);
             g2.drawOval(px - 4, py - 4, 8, 8);
@@ -209,6 +310,7 @@ public class GraphPanel extends JPanel {
         Path2D.Double path = new Path2D.Double();
         boolean started = false;
         double step = (xMax - xMin) / w;
+
         for (double x = highlightA; x <= highlightB; x += step) {
             double y = highlightedFunc.apply(x);
             if (Double.isFinite(y)) {
@@ -222,12 +324,14 @@ public class GraphPanel extends JPanel {
                 }
             }
         }
+
         int endX = (int) ((highlightB - xMin) * sX);
         int startX = (int) ((highlightA - xMin) * sX);
         int baseY = h - (int) ((0 - yMin) * sY);
         path.lineTo(endX, baseY);
         path.lineTo(startX, baseY);
         path.closePath();
+
         g2.setColor(new Color(255, 255, 0, 100));
         g2.fill(path);
     }
@@ -235,10 +339,12 @@ public class GraphPanel extends JPanel {
     private void drawGrid(Graphics2D g2, int w, int h, double sX, double sY) {
         g2.setColor(new Color(60, 60, 60));
         g2.setStroke(new BasicStroke(0.5f));
+
         for (double x = Math.ceil(xMin); x <= Math.floor(xMax); x++) {
             int px = (int) ((x - xMin) * sX);
             g2.drawLine(px, 0, px, h);
         }
+
         for (double y = Math.ceil(yMin); y <= Math.floor(yMax); y++) {
             int py = h - (int) ((y - yMin) * sY);
             g2.drawLine(0, py, w, py);
@@ -248,8 +354,10 @@ public class GraphPanel extends JPanel {
     private void drawAxes(Graphics2D g2, int w, int h, double sX, double sY) {
         g2.setColor(Color.WHITE);
         g2.setStroke(new BasicStroke(2f));
+
         int y0 = h - (int) ((0 - yMin) * sY);
         if (y0 >= 0 && y0 <= h) g2.drawLine(0, y0, w, y0);
+
         int x0 = (int) ((0 - xMin) * sX);
         if (x0 >= 0 && x0 <= w) g2.drawLine(x0, 0, x0, h);
     }
@@ -257,20 +365,24 @@ public class GraphPanel extends JPanel {
     private void drawLabels(Graphics2D g2, int w, int h, double sX, double sY) {
         g2.setColor(Color.LIGHT_GRAY);
         g2.setFont(new Font("Arial", Font.PLAIN, 12));
+
         int y0 = h - (int) ((0 - yMin) * sY);
         int x0 = (int) ((0 - xMin) * sX);
+
         for (double x = Math.ceil(xMin); x <= Math.floor(xMax); x++) {
             if (Math.abs(x) > 1e-6) {
                 int px = (int) ((x - xMin) * sX);
                 g2.drawString(String.format("%.0f", x), px - 5, Math.min(y0 + 18, h - 5));
             }
         }
+
         for (double y = Math.ceil(yMin); y <= Math.floor(yMax); y++) {
             if (Math.abs(y) > 1e-6) {
                 int py = h - (int) ((y - yMin) * sY);
                 g2.drawString(String.format("%.0f", y), Math.max(x0 + 8, 5), py + 4);
             }
         }
+
         if (xMin < 0 && xMax > 0 && yMin < 0 && yMax > 0) {
             g2.setColor(Color.WHITE);
             g2.drawString("0", x0 + 8, y0 + 18);
@@ -280,32 +392,32 @@ public class GraphPanel extends JPanel {
     private void drawFunction(Graphics2D g2, PlotFunction pf, int w, int h, double sX, double sY) {
         g2.setColor(pf.getColor());
         g2.setStroke(new BasicStroke(2f));
+
         Path2D.Double path = new Path2D.Double();
         boolean started = false;
-        double step = Math.max((xMax - xMin) / w, 0.001); // minimum step size to capture detail
-
+        double step = Math.max((xMax - xMin) / w, 0.001);
         double prevY = Double.NaN;
+
         for (double x = xMin; x <= xMax; x += step) {
             double y = pf.getFunction().apply(x);
-
             boolean finite = Double.isFinite(y);
-            boolean jump = finite && Double.isFinite(prevY) && Math.abs(y - prevY) > 10; // jump threshold
+            boolean jump = finite && Double.isFinite(prevY) && Math.abs(y - prevY) > 10;
 
-        if (finite && y >= yMin && y <= yMax && !jump) {
-        int px = (int) ((x - xMin) * sX);
-        int py = h - (int) ((y - yMin) * sY);
-        if (!started) {
-            path.moveTo(px, py);
-            started = true;
-        } else {
-            path.lineTo(px, py);
+            if (finite && y >= yMin && y <= yMax && !jump) {
+                int px = (int) ((x - xMin) * sX);
+                int py = h - (int) ((y - yMin) * sY);
+                if (!started) {
+                    path.moveTo(px, py);
+                    started = true;
+                } else {
+                    path.lineTo(px, py);
+                }
+            } else {
+                started = false;
+            }
+
+            if (finite) prevY = y;
         }
-    } else {
-        started = false;
-    }
-
-    if (finite) prevY = y;
-}
 
         g2.draw(path);
     }
@@ -313,7 +425,15 @@ public class GraphPanel extends JPanel {
     private void drawLimitsInfo(Graphics2D g2) {
         g2.setColor(Color.CYAN);
         g2.setFont(new Font("Arial", Font.PLAIN, 12));
-        g2.drawString(String.format("Limits: X[%.2f, %.2f] Y[%.2f, %.2f]", xMin, xMax, yMin, yMax), 10, getHeight() - 10);
+        g2.drawString(String.format("Limits: X[%.2f, %.2f] Y[%.2f, %.2f]", xMin, xMax, yMin, yMax), 
+                     10, getHeight() - 10);
+        
+        // Show intersection count
+        if (!intersectionPoints.isEmpty()) {
+            g2.setColor(Color.YELLOW);
+            g2.drawString(String.format("Intersections: %d", intersectionPoints.size()), 
+                         10, getHeight() - 30);
+        }
     }
 
     public void exportToSVG(File file) {
