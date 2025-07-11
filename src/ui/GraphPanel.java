@@ -1,12 +1,20 @@
 package src.ui;
 
+import org.apache.batik.svggen.SVGGraphics2D;
+import org.apache.batik.dom.GenericDOMImplementation;
+import org.w3c.dom.DOMImplementation;
+import org.w3c.dom.Document;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.geom.Path2D;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
 import java.util.List;
 import java.util.function.Function;
 import javax.swing.*;
-import javax.swing.ToolTipManager;
+
 import src.util.PlotFunction;
 
 public class GraphPanel extends JPanel {
@@ -271,4 +279,30 @@ public class GraphPanel extends JPanel {
         g2.setFont(new Font("Arial", Font.PLAIN, 12));
         g2.drawString(String.format("Limits: X[%.2f, %.2f] Y[%.2f, %.2f]", xMin, xMax, yMin, yMax), 10, getHeight() - 10);
     }
+
+   public void exportToSVG(File file) {
+    try {
+        System.out.println("GraphPanel size: " + this.getWidth() + " x " + this.getHeight());
+
+        DOMImplementation domImpl = GenericDOMImplementation.getDOMImplementation();
+        String svgNS = "http://www.w3.org/2000/svg";
+        Document document = domImpl.createDocument(svgNS, "svg", null);
+
+        SVGGraphics2D svgGenerator = new SVGGraphics2D(document);
+        svgGenerator.setSVGCanvasSize(new java.awt.Dimension(this.getWidth(), this.getHeight()));
+
+        this.paint(svgGenerator); // Render your graph
+
+        boolean useCSS = true;
+        try (Writer out = new OutputStreamWriter(new FileOutputStream(file), "UTF-8")) {
+            svgGenerator.stream(out, useCSS);
+        }
+
+        System.out.println("Export complete. Saved to: " + file.getAbsolutePath());
+
+    } catch (Exception e) {
+        e.printStackTrace();
+    }
+}
+   
 }

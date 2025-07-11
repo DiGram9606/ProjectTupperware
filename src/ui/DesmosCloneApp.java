@@ -1,5 +1,6 @@
 package src.ui;
 
+import src.ui.GraphPanel;
 import src.util.PlotFunction;
 import src.util.IntersectionSolver;
 import src.util.SavedGraphState;
@@ -9,6 +10,7 @@ import src.util.EquationParser;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
@@ -19,6 +21,7 @@ public class DesmosCloneApp extends JFrame {
     private JTextField parametersField;
     private JButton plotButton;
     private JButton clearButton;
+    private JButton exportSVGButton;
     private JButton bgColorButton;
     private JButton intersectionButton;
     private JButton saveButton;
@@ -63,6 +66,9 @@ public class DesmosCloneApp extends JFrame {
 
         plotButton = new JButton("Plot Function");
         plotButton.setFont(new Font("Arial", Font.PLAIN, 12));
+
+        exportSVGButton = new JButton("Export as SVG");
+        exportSVGButton.setFont(new Font("Arial", Font.PLAIN, 12));
 
         clearButton = new JButton("Clear All");
         clearButton.setFont(new Font("Arial", Font.PLAIN, 12));
@@ -117,7 +123,8 @@ public class DesmosCloneApp extends JFrame {
         JPanel topPanel = new JPanel(new BorderLayout(5, 5));
         topPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 5, 10));
 
-        JPanel functionPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
+        JPanel functionPanel = new JPanel();
+        functionPanel.setLayout(new BoxLayout(functionPanel, BoxLayout.X_AXIS));
         functionPanel.setBorder(BorderFactory.createTitledBorder("Function Controls"));
 
         functionPanel.add(new JLabel("Function:"));
@@ -130,6 +137,13 @@ public class DesmosCloneApp extends JFrame {
         functionPanel.add(intersectionButton);
         functionPanel.add(saveButton);
         functionPanel.add(loadButton);
+        functionPanel.add(exportSVGButton);
+
+        JScrollPane functionScrollPane = new JScrollPane(
+        functionPanel,
+        JScrollPane.VERTICAL_SCROLLBAR_NEVER,
+        JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED
+        );
 
         JPanel limitsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
         limitsPanel.setBorder(BorderFactory.createTitledBorder("Axis Limits"));
@@ -154,7 +168,7 @@ public class DesmosCloneApp extends JFrame {
         areaPanel.add(upperLimitField);
         areaPanel.add(calculateAreaButton);
 
-        topPanel.add(functionPanel, BorderLayout.NORTH);
+        topPanel.add(functionScrollPane, BorderLayout.NORTH);
         topPanel.add(limitsPanel, BorderLayout.CENTER);
         topPanel.add(areaPanel, BorderLayout.SOUTH);
 
@@ -200,6 +214,8 @@ public class DesmosCloneApp extends JFrame {
         intersectionButton.addActionListener(e -> findIntersections());
         saveButton.addActionListener(e -> saveGraphStateToFile());
         loadButton.addActionListener(e -> loadGraphStateFromFile());
+
+        exportSVGButton.addActionListener(e -> exportGraphToSVG());
 
         setLimitsButton.addActionListener(e -> setAxisLimits());
         resetLimitsButton.addActionListener(e -> resetLimits());
@@ -399,4 +415,24 @@ public class DesmosCloneApp extends JFrame {
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> new DesmosCloneApp().setVisible(true));
     }
+
+    
+private void exportGraphToSVG() {
+    JFileChooser fileChooser = new JFileChooser();
+    fileChooser.setDialogTitle("Save Graph as SVG");
+    int userSelection = fileChooser.showSaveDialog(this);
+
+    if (userSelection == JFileChooser.APPROVE_OPTION) {
+        File fileToSave = fileChooser.getSelectedFile();
+
+        // Ensure .svg extension
+        if (!fileToSave.getName().toLowerCase().endsWith(".svg")) {
+            fileToSave = new File(fileToSave.getParentFile(), fileToSave.getName() + ".svg");
+        }
+
+        System.out.println("Exporting SVG to: " + fileToSave.getAbsolutePath());
+
+        graphPanel.exportToSVG(fileToSave);
+    }
+}
 }
