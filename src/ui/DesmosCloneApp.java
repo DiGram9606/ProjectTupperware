@@ -1,5 +1,8 @@
 package src.ui;
 
+import java.io.FileOutputStream;
+import java.io.ObjectOutputStream;
+import java.io.IOException;
 import src.ui.GraphPanel;
 import src.util.PlotFunction;
 import src.util.IntersectionSolver;
@@ -11,14 +14,15 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.io.File;
+import java.io.ObjectInputStream;
+import java.io.FileInputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
 
 public class DesmosCloneApp extends JFrame {
     private GraphPanel graphPanel;
-    private JComboBox<String> functionTypeBox;
-    private JTextField parametersField;
+    private JTextField expressionField;
     private JButton plotButton;
     private JButton clearButton;
     private JButton exportSVGButton;
@@ -50,8 +54,7 @@ public class DesmosCloneApp extends JFrame {
     }
 
     private void initializeComponents() {
-        functionTypeBox = new JComboBox<>(new String[]{"sin(x)", "cos(x)", "tan(x)", "x^2", "x^3", "2x+3", "log(x)", "exp(x)", "step(x)"});
-        parametersField = new JTextField("1", 8);
+        expressionField = new JTextField("sin(x)", 15);
         plotButton = new JButton("Plot Function");
         plotButton.setFont(new Font("Arial", Font.PLAIN, 12));
         exportSVGButton = new JButton("Export as SVG");
@@ -94,13 +97,12 @@ public class DesmosCloneApp extends JFrame {
         setLayout(new BorderLayout(5, 5));
         JPanel topPanel = new JPanel(new BorderLayout(5, 5));
         topPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 5, 10));
+
         JPanel functionPanel = new JPanel();
         functionPanel.setLayout(new BoxLayout(functionPanel, BoxLayout.X_AXIS));
         functionPanel.setBorder(BorderFactory.createTitledBorder("Function Controls"));
-        functionPanel.add(new JLabel("Function:"));
-        functionPanel.add(functionTypeBox);
-        functionPanel.add(new JLabel("Parameter:"));
-        functionPanel.add(parametersField);
+        functionPanel.add(new JLabel("f(x):"));
+        functionPanel.add(expressionField);
         functionPanel.add(plotButton);
         functionPanel.add(clearButton);
         functionPanel.add(bgColorButton);
@@ -108,29 +110,29 @@ public class DesmosCloneApp extends JFrame {
         functionPanel.add(saveButton);
         functionPanel.add(loadButton);
         functionPanel.add(exportSVGButton);
-        JScrollPane functionScrollPane = new JScrollPane(functionPanel, JScrollPane.VERTICAL_SCROLLBAR_NEVER, JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+        JScrollPane functionScroll = new JScrollPane(functionPanel,
+            JScrollPane.VERTICAL_SCROLLBAR_NEVER,
+            JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+
         JPanel limitsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
         limitsPanel.setBorder(BorderFactory.createTitledBorder("Axis Limits"));
-        limitsPanel.add(new JLabel("X Min:"));
-        limitsPanel.add(xMinField);
-        limitsPanel.add(new JLabel("X Max:"));
-        limitsPanel.add(xMaxField);
-        limitsPanel.add(new JLabel("Y Min:"));
-        limitsPanel.add(yMinField);
-        limitsPanel.add(new JLabel("Y Max:"));
-        limitsPanel.add(yMaxField);
+        limitsPanel.add(new JLabel("X Min:")); limitsPanel.add(xMinField);
+        limitsPanel.add(new JLabel("X Max:")); limitsPanel.add(xMaxField);
+        limitsPanel.add(new JLabel("Y Min:")); limitsPanel.add(yMinField);
+        limitsPanel.add(new JLabel("Y Max:")); limitsPanel.add(yMaxField);
         limitsPanel.add(setLimitsButton);
         limitsPanel.add(resetLimitsButton);
+
         JPanel areaPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
         areaPanel.setBorder(BorderFactory.createTitledBorder("Definite Integral"));
-        areaPanel.add(new JLabel("Lower Limit:"));
-        areaPanel.add(lowerLimitField);
-        areaPanel.add(new JLabel("Upper Limit:"));
-        areaPanel.add(upperLimitField);
+        areaPanel.add(new JLabel("Lower Limit:")); areaPanel.add(lowerLimitField);
+        areaPanel.add(new JLabel("Upper Limit:")); areaPanel.add(upperLimitField);
         areaPanel.add(calculateAreaButton);
-        topPanel.add(functionScrollPane, BorderLayout.NORTH);
+
+        topPanel.add(functionScroll, BorderLayout.NORTH);
         topPanel.add(limitsPanel, BorderLayout.CENTER);
         topPanel.add(areaPanel, BorderLayout.SOUTH);
+
         JPanel bottomPanel = new JPanel(new BorderLayout());
         bottomPanel.setBorder(BorderFactory.createEmptyBorder(5, 10, 10, 10));
         JPanel bottomLeft = new JPanel(new FlowLayout(FlowLayout.LEFT));
@@ -138,19 +140,23 @@ public class DesmosCloneApp extends JFrame {
         bottomLeft.add(integralValueLabel);
         bottomPanel.add(bottomLeft, BorderLayout.WEST);
         bottomPanel.add(functionCountLabel, BorderLayout.EAST);
-        JPanel equationMakerPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
-        equationMakerPanel.add(equationMakerButton);
-        JPanel southPanel = new JPanel();
-        southPanel.setLayout(new BoxLayout(southPanel, BoxLayout.Y_AXIS));
-        southPanel.add(equationMakerPanel);
-        southPanel.add(bottomPanel);
+
+        JPanel eqMakerPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        eqMakerPanel.add(equationMakerButton);
+
+        JPanel south = new JPanel();
+        south.setLayout(new BoxLayout(south, BoxLayout.Y_AXIS));
+        south.add(eqMakerPanel);
+        south.add(bottomPanel);
+
         add(topPanel, BorderLayout.NORTH);
         add(graphPanel, BorderLayout.CENTER);
-        add(southPanel, BorderLayout.SOUTH);
+        add(south, BorderLayout.SOUTH);
     }
 
     private void setupEventListeners() {
         plotButton.addActionListener(e -> plotFunction());
+        expressionField.addActionListener(e -> plotFunction());
         clearButton.addActionListener(e -> {
             functions.clear();
             graphPanel.clearHighlight();
@@ -171,13 +177,27 @@ public class DesmosCloneApp extends JFrame {
         exportSVGButton.addActionListener(e -> exportGraphToSVG());
         setLimitsButton.addActionListener(e -> setAxisLimits());
         resetLimitsButton.addActionListener(e -> resetLimits());
-        parametersField.addActionListener(e -> plotFunction());
-        xMinField.addActionListener(e -> setAxisLimits());
-        xMaxField.addActionListener(e -> setAxisLimits());
-        yMinField.addActionListener(e -> setAxisLimits());
-        yMaxField.addActionListener(e -> setAxisLimits());
         calculateAreaButton.addActionListener(e -> calculateDefiniteIntegral());
         equationMakerButton.addActionListener(e -> openEquationMaker());
+    }
+
+    private void plotFunction() {
+        String expr = expressionField.getText().trim();
+        if (expr.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Please enter an expression.");
+            return;
+        }
+        try {
+            Function<Double, Double> f = EquationParser.parse(expr);
+            functions.add(new PlotFunction(expr, f));
+            graphPanel.setFunctions(functions);
+            graphPanel.repaint();
+            updateStatus();
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this,
+                "Invalid expression: " + ex.getMessage(),
+                "Error", JOptionPane.ERROR_MESSAGE);
+        }
     }
 
     private void calculateDefiniteIntegral() {
@@ -197,74 +217,31 @@ public class DesmosCloneApp extends JFrame {
             double area = AreaCalculator.computeDefiniteIntegral(f, a, b, 1000);
             graphPanel.highlightAreaUnder(f, a, b);
             integralValueLabel.setText(String.format("Integral: %.5f", area));
-            JOptionPane.showMessageDialog(this, String.format("Definite integral from %.2f to %.2f:\nArea = %.5f", a, b, area), "Integral Result", JOptionPane.INFORMATION_MESSAGE);
+            JOptionPane.showMessageDialog(this,
+                String.format("Definite integral from %.2f to %.2f:\nArea = %.5f", a, b, area),
+                "Integral Result", JOptionPane.INFORMATION_MESSAGE);
         } catch (NumberFormatException ex) {
             JOptionPane.showMessageDialog(this, "Invalid limits for integration.");
         }
     }
 
-    private void plotFunction() {
-        String type = (String) functionTypeBox.getSelectedItem();
-        double param;
-        try {
-            param = Double.parseDouble(parametersField.getText());
-        } catch (NumberFormatException e) {
-            JOptionPane.showMessageDialog(this, "Invalid parameter value.", "Input Error", JOptionPane.ERROR_MESSAGE);
-            return;
-        }
-        Function<Double, Double> func;
-        switch (type) {
-            case "sin(x)":
-                func = x -> param * Math.sin(x);
-                break;
-            case "cos(x)":
-                func = x -> param * Math.cos(x);
-                break;
-            case "tan(x)":
-                func = x -> param * Math.tan(x);
-                break;
-            case "x^2":
-                func = x -> param * x * x;
-                break;
-            case "x^3":
-                func = x -> param * x * x * x;
-                break;
-            case "2x+3":
-                func = x -> param * (2 * x + 3);
-                break;
-            case "log(x)":
-                func = x -> x <= 0 ? Double.NaN : param * Math.log(x);
-                break;
-            case "exp(x)":
-                func = x -> param * Math.exp(x);
-                break;
-            case "step(x)":
-                func = x -> x >= 0 ? param : 0;
-                break;
-            default:
-                return;
-        }
-        functions.add(new PlotFunction(type + "(param: " + param + ")", func));
-        graphPanel.setFunctions(functions);
-        graphPanel.repaint();
-        updateStatus();
-    }
-
     private void setAxisLimits() {
         try {
-            double xMin = Double.parseDouble(xMinField.getText());
-            double xMax = Double.parseDouble(xMaxField.getText());
-            double yMin = Double.parseDouble(yMinField.getText());
-            double yMax = Double.parseDouble(yMaxField.getText());
-            if (xMin >= xMax || yMin >= yMax) {
-                JOptionPane.showMessageDialog(this, "Invalid axis limits.", "Input Error", JOptionPane.WARNING_MESSAGE);
+            double xmin = Double.parseDouble(xMinField.getText());
+            double xmax = Double.parseDouble(xMaxField.getText());
+            double ymin = Double.parseDouble(yMinField.getText());
+            double ymax = Double.parseDouble(yMaxField.getText());
+            if (xmin >= xmax || ymin >= ymax) {
+                JOptionPane.showMessageDialog(this,
+                    "Invalid axis limits.", "Input Error", JOptionPane.WARNING_MESSAGE);
                 return;
             }
-            graphPanel.setLimits(xMin, xMax, yMin, yMax);
+            graphPanel.setLimits(xmin, xmax, ymin, ymax);
             graphPanel.repaint();
             statusLabel.setText("Limits updated");
         } catch (NumberFormatException e) {
-            JOptionPane.showMessageDialog(this, "Enter valid numbers.", "Input Error", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this,
+                "Enter valid numbers.", "Input Error", JOptionPane.ERROR_MESSAGE);
         }
     }
 
@@ -277,20 +254,18 @@ public class DesmosCloneApp extends JFrame {
         statusLabel.setText("Limits reset");
     }
 
-    private void updateStatus() {
-        functionCountLabel.setText("Functions: " + functions.size());
-        statusLabel.setText(functions.isEmpty() ? "Ready to plot functions" : "Displaying " + functions.size() + " function(s)");
-    }
-
     private void findIntersections() {
         if (functions.size() < 2) {
-            JOptionPane.showMessageDialog(this, "Need at least 2 functions.", "Error", JOptionPane.INFORMATION_MESSAGE);
+            JOptionPane.showMessageDialog(this,
+                "Need at least 2 functions.", "Error", JOptionPane.INFORMATION_MESSAGE);
             return;
         }
         List<IntersectionSolver.IntersectionPoint> all = new ArrayList<>();
         for (int i = 0; i < functions.size(); i++) {
             for (int j = i + 1; j < functions.size(); j++) {
-                all.addAll(IntersectionSolver.findAllIntersections(functions.get(i), functions.get(j), -10, 10));
+                all.addAll(IntersectionSolver.findAllIntersections(
+                    functions.get(i), functions.get(j), -10, 10
+                ));
             }
         }
         if (all.isEmpty()) {
@@ -303,8 +278,9 @@ public class DesmosCloneApp extends JFrame {
 
     private void showIntersections(List<IntersectionSolver.IntersectionPoint> intersections) {
         StringBuilder sb = new StringBuilder("Intersection Points:\n\n");
-        for (IntersectionSolver.IntersectionPoint p : intersections) {
-            sb.append(String.format("Between %s and %s:\n Point:(%.3f, %.3f)\n\n", p.function1Name, p.function2Name, p.point.getX(), p.point.getY()));
+        for (var p : intersections) {
+            sb.append(String.format("Between %s and %s:\n  Point: (%.3f, %.3f)\n\n",
+                p.function1Name, p.function2Name, p.point.getX(), p.point.getY()));
         }
         JOptionPane.showMessageDialog(this, sb.toString(), "Intersections", JOptionPane.INFORMATION_MESSAGE);
     }
@@ -312,54 +288,51 @@ public class DesmosCloneApp extends JFrame {
     private void saveGraphStateToFile() {
     List<SavedGraphState.SerializableFunction> serialized = new ArrayList<>();
     for (PlotFunction pf : functions) {
-        try {
-            String label = pf.getLabel();
-            String type = label.split(" ")[0];
-            double param = Double.parseDouble(label.replaceAll(".*\\(param: ", "").replaceAll("\\)", ""));
-            serialized.add(new SavedGraphState.SerializableFunction(type, param));
-        } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Failed to serialize function: " + e.getMessage());
-        }
+        serialized.add(new SavedGraphState.SerializableFunction(pf.getLabel()));
     }
 
-    JFileChooser fileChooser = new JFileChooser();
-    fileChooser.setDialogTitle("Save Graph State");
-    int userSelection = fileChooser.showSaveDialog(this);
-    if (userSelection == JFileChooser.APPROVE_OPTION) {
-        java.io.File file = fileChooser.getSelectedFile();
-        try (java.io.ObjectOutputStream out = new java.io.ObjectOutputStream(new java.io.FileOutputStream(file))) {
-            SavedGraphState state = new SavedGraphState(serialized, bgColor);
-            out.writeObject(state);
+    JFileChooser chooser = new JFileChooser();
+    chooser.setDialogTitle("Save Graph State");
+    if (chooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
+        File file = chooser.getSelectedFile();
+        try (ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(file))) {
+            out.writeObject(new SavedGraphState(serialized, bgColor));
             JOptionPane.showMessageDialog(this, "Graph saved to " + file.getName());
         } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Error saving: " + e.getMessage());
+            JOptionPane.showMessageDialog(this, "Save error: " + e.getMessage());
         }
     }
 }
 
-private void loadGraphStateFromFile() {
-    JFileChooser fileChooser = new JFileChooser();
-    fileChooser.setDialogTitle("Load Graph State");
-    int userSelection = fileChooser.showOpenDialog(this);
-    if (userSelection == JFileChooser.APPROVE_OPTION) {
-        java.io.File file = fileChooser.getSelectedFile();
-        try (java.io.ObjectInputStream in = new java.io.ObjectInputStream(new java.io.FileInputStream(file))) {
+
+    private void loadGraphStateFromFile() {
+    JFileChooser chooser = new JFileChooser();
+    chooser.setDialogTitle("Load Graph State");
+    if (chooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
+        File file = chooser.getSelectedFile();
+        try (ObjectInputStream in = new ObjectInputStream(new FileInputStream(file))) {
             SavedGraphState state = (SavedGraphState) in.readObject();
             functions.clear();
             for (SavedGraphState.SerializableFunction sf : state.functions) {
-                functions.add(new PlotFunction(sf.label, sf.toFunction()));
+                try {
+                    Function<Double, Double> func = EquationParser.parse(sf.expression);
+                    functions.add(new PlotFunction(sf.expression, func));
+                } catch (Exception e) {
+                    System.err.println("Could not parse expression: " + sf.expression);
+                }
             }
-            this.bgColor = state.background;
+            bgColor = state.background;
             graphPanel.setBackground(bgColor);
             graphPanel.setFunctions(functions);
             graphPanel.repaint();
             updateStatus();
-            JOptionPane.showMessageDialog(this, "Graph loaded from " + file.getName());
+            JOptionPane.showMessageDialog(this, "Loaded from " + file.getName());
         } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Error loading: " + e.getMessage());
+            JOptionPane.showMessageDialog(this, "Load error: " + e.getMessage());
         }
     }
 }
+
 
 
     private void openEquationMaker() {
@@ -379,6 +352,26 @@ private void loadGraphStateFromFile() {
         }
     }
 
+    private void exportGraphToSVG() {
+        JFileChooser chooser = new JFileChooser();
+        chooser.setDialogTitle("Save Graph as SVG");
+        int sel = chooser.showSaveDialog(this);
+        if (sel == JFileChooser.APPROVE_OPTION) {
+            File out = chooser.getSelectedFile();
+            if (!out.getName().toLowerCase().endsWith(".svg")) {
+                out = new File(out.getParentFile(), out.getName() + ".svg");
+            }
+            graphPanel.exportToSVG(out);
+        }
+    }
+
+    private void updateStatus() {
+        functionCountLabel.setText("Functions: " + functions.size());
+        statusLabel.setText(functions.isEmpty()
+            ? "Ready to plot functions"
+            : "Displaying " + functions.size() + " function(s)");
+    }
+
     public GraphPanel getGraphPanel() {
         return graphPanel;
     }
@@ -389,19 +382,5 @@ private void loadGraphStateFromFile() {
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> new DesmosCloneApp().setVisible(true));
-    }
-
-    private void exportGraphToSVG() {
-        JFileChooser fileChooser = new JFileChooser();
-        fileChooser.setDialogTitle("Save Graph as SVG");
-        int userSelection = fileChooser.showSaveDialog(this);
-        if (userSelection == JFileChooser.APPROVE_OPTION) {
-            File fileToSave = fileChooser.getSelectedFile();
-            if (!fileToSave.getName().toLowerCase().endsWith(".svg")) {
-                fileToSave = new File(fileToSave.getParentFile(), fileToSave.getName() + ".svg");
-            }
-            System.out.println("Exporting SVG to: " + fileToSave.getAbsolutePath());
-            graphPanel.exportToSVG(fileToSave);
-        }
     }
 }
