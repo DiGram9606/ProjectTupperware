@@ -233,4 +233,33 @@ public class ExtremaFinder {
         
         return results;
     }
+    
+    // Legacy method for backward compatibility
+    public static List<Double> findExtrema(String expr, double xMin, double xMax, double step, double tolerance) {
+        List<Double> extrema = new ArrayList<>();
+        double h = 1e-5;
+        Function<Double, Double> f = EquationParser.parse(expr);
+        
+        for (double x = xMin; x < xMax; x += step) {
+            double d1 = derivative(f, x, h);
+            double d2 = derivative(f, x + step, h);
+            
+            if (d1 * d2 < 0) {
+                double a = x, b = x + step;
+                for (int i = 0; i < 100; i++) {
+                    double mid = (a + b) / 2;
+                    double dm = derivative(f, mid, h);
+                    if (Math.abs(dm) < tolerance) {
+                        extrema.add(mid);
+                        break;
+                    } else if (derivative(f, a, h) * dm < 0) {
+                        b = mid;
+                    } else {
+                        a = mid;
+                    }
+                }
+            }
+        }
+        return extrema;
+    }
 }
