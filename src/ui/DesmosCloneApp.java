@@ -43,7 +43,7 @@ public class DesmosCloneApp extends JFrame {
     private JButton calculateAreaButton;
     private JButton equationMakerButton;
     
-    // Add extrema fields
+    // Extrema fields
     private JTextField extremaXMinField, extremaXMaxField;
     private JButton findExtremaButton;
     private JButton clearExtremaButton;
@@ -333,7 +333,7 @@ public class DesmosCloneApp extends JFrame {
         JOptionPane.showMessageDialog(this, sb.toString(), "Intersections", JOptionPane.INFORMATION_MESSAGE);
     }
 
-    // Add extrema methods
+    // Extrema methods
     private void findAndDisplayExtrema() {
         if (functions.isEmpty()) {
             JOptionPane.showMessageDialog(this, "No functions to analyze.");

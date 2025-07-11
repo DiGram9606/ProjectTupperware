@@ -119,7 +119,7 @@ public class EquationParser {
             throw new RuntimeException("Unknown variable or function: " + name);
         }
 
-        // Corrected Greatest Integer Function (Floor Function)
+        // Greatest Integer Function (Floor Function) - True Step Function
         private double stepFunction(double x) {
             return Math.floor(x);
         }
