@@ -21,6 +21,7 @@ import javax.swing.*;
 import src.util.PlotFunction;
 import src.util.IntersectionSolver;
 import src.util.ExtremaFinder;
+import src.util.Derivative;
 
 public class GraphPanel extends JPanel {
     private List<PlotFunction> functions;
@@ -41,6 +42,10 @@ public class GraphPanel extends JPanel {
     
     // Extrema points storage
     private List<ExtremaFinder.ExtremaPoint> extremaPoints = new ArrayList<>();
+    
+    // Derivative analysis storage
+    private Derivative.DerivativeResult derivativeResult = null;
+    private List<Point2D> nonDifferentiablePoints = new ArrayList<>();
 
     public GraphPanel() {
         this.setBackground(Color.BLACK);
@@ -108,6 +113,23 @@ public class GraphPanel extends JPanel {
     // Method to display extrema
     public void highlightExtrema(List<ExtremaFinder.ExtremaPoint> extrema) {
         this.extremaPoints = extrema;
+        repaint();
+    }
+
+    // Methods for derivative functionality
+    public void setDerivativeResult(Derivative.DerivativeResult result) {
+        this.derivativeResult = result;
+        repaint();
+    }
+
+    public void clearDerivative() {
+        this.derivativeResult = null;
+        this.nonDifferentiablePoints.clear();
+        repaint();
+    }
+
+    public void highlightNonDifferentiablePoints(List<Point2D> points) {
+        this.nonDifferentiablePoints = points;
         repaint();
     }
 
@@ -194,6 +216,19 @@ public class GraphPanel extends JPanel {
 
         final int tolerance = 8;
 
+        // Check for non-differentiable points
+        for (Point2D point : nonDifferentiablePoints) {
+            double screenX = (point.getX() - xMin) * w / (xMax - xMin);
+            double screenY = h - (point.getY() - yMin) * h / (yMax - yMin);
+            
+            double distance = Math.sqrt(Math.pow(screenX - mouseX, 2) + Math.pow(screenY - mouseY, 2));
+            
+            if (distance <= tolerance) {
+                return String.format("<html><b>Non-Differentiable Point</b><br><b>X: %.4f</b><br><b>Y: %.4f</b><br>Function has sharp corner or cusp</html>", 
+                    point.getX(), point.getY());
+            }
+        }
+
         // First check for intersection points
         for (IntersectionSolver.IntersectionPoint intersection : intersectionPoints) {
             Point2D point = intersection.point;
@@ -216,8 +251,10 @@ public class GraphPanel extends JPanel {
             if (Double.isFinite(y)) {
                 double screenY = h - (y - yMin) * h / (yMax - yMin);
                 if (Math.abs(screenY - mouseY) <= tolerance) {
-                    return String.format("<html><b>Function Point</b><br><b>X: %.4f</b><br><b>Y: %.4f</b><br>Function: %s</html>", 
-                        worldX, y, pf.getLabel());
+                    // Check if this is a derivative function
+                    String functionType = pf.getLabel().startsWith("d/dx[") ? "Derivative" : "Function";
+                    return String.format("<html><b>%s Point</b><br><b>X: %.4f</b><br><b>Y: %.4f</b><br>Function: %s</html>", 
+                        functionType, worldX, y, pf.getLabel());
                 }
             }
         }
@@ -260,6 +297,9 @@ public class GraphPanel extends JPanel {
 
         // Draw extrema points
         drawExtremaPoints(g2, w, h, sX, sY);
+
+        // Draw non-differentiable points
+        drawNonDifferentiablePoints(g2, w, h, sX, sY);
 
         if (!highlightedPoints.isEmpty()) {
             drawCriticalPoints(g2, w, h, sX, sY);
@@ -389,6 +429,36 @@ public class GraphPanel extends JPanel {
         }
     }
 
+    // Method to draw non-differentiable points
+    private void drawNonDifferentiablePoints(Graphics2D g2, int w, int h, double sX, double sY) {
+        for (Point2D point : nonDifferentiablePoints) {
+            // Convert to screen coordinates
+            int px = (int) ((point.getX() - xMin) * sX);
+            int py = h - (int) ((point.getY() - yMin) * sY);
+            
+            // Only draw if visible
+            if (px >= 0 && px <= w && py >= 0 && py <= h) {
+                // Draw purple diamond for non-differentiable points
+                g2.setColor(new Color(128, 0, 128)); // Purple
+                g2.setStroke(new BasicStroke(2f));
+                
+                // Draw diamond shape
+                int[] xPoints = {px, px + 6, px, px - 6};
+                int[] yPoints = {py - 6, py, py + 6, py};
+                g2.fillPolygon(xPoints, yPoints, 4);
+                
+                // Draw white border
+                g2.setColor(Color.WHITE);
+                g2.drawPolygon(xPoints, yPoints, 4);
+                
+                // Draw exclamation mark
+                g2.setColor(Color.WHITE);
+                g2.setFont(new Font("Arial", Font.BOLD, 8));
+                g2.drawString("!", px - 2, py + 2);
+            }
+        }
+    }
+
     private void drawCriticalPoints(Graphics2D g2, int w, int h, double sX, double sY) {
         g2.setStroke(new BasicStroke(3f));
         for (Map.Entry<Point2D, String> entry : highlightedPoints.entrySet()) {
@@ -496,8 +566,15 @@ public class GraphPanel extends JPanel {
 
     // Regular function drawing for non-step functions
     private void drawFunction(Graphics2D g2, PlotFunction pf, int w, int h, double sX, double sY) {
+        // Use different style for derivative functions
+        if (pf.getLabel().startsWith("d/dx[")) {
+            g2.setStroke(new BasicStroke(2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 
+                0, new float[]{5f, 5f}, 0)); // Dashed line for derivatives
+        } else {
+            g2.setStroke(new BasicStroke(2f));
+        }
+        
         g2.setColor(pf.getColor());
-        g2.setStroke(new BasicStroke(2f));
 
         Path2D.Double path = new Path2D.Double();
         boolean started = false;
@@ -546,6 +623,20 @@ public class GraphPanel extends JPanel {
             g2.setColor(Color.ORANGE);
             g2.drawString(String.format("Extrema: %d", extremaPoints.size()), 
                          10, getHeight() - 50);
+        }
+        
+        // Show non-differentiable points count
+        if (!nonDifferentiablePoints.isEmpty()) {
+            g2.setColor(new Color(128, 0, 128));
+            g2.drawString(String.format("Non-diff points: %d", nonDifferentiablePoints.size()), 
+                         10, getHeight() - 70);
+        }
+        
+        // Show derivative info
+        if (derivativeResult != null) {
+            g2.setColor(Color.GREEN);
+            g2.drawString("Derivative: " + derivativeResult.derivativeExpression, 
+                         10, getHeight() - 90);
         }
     }
 

@@ -11,6 +11,7 @@ import src.util.EquationMaker;
 import src.util.AreaCalculator;
 import src.util.EquationParser;
 import src.util.ExtremaFinder;
+import src.util.Derivative;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
@@ -47,11 +48,19 @@ public class DesmosCloneApp extends JFrame {
     private JTextField extremaXMinField, extremaXMaxField;
     private JButton findExtremaButton;
     private JButton clearExtremaButton;
+    
+    // Derivative fields
+    private JButton calculateDerivativeButton;
+    private JButton clearDerivativeButton;
+    private JButton showNonDiffPointsButton;
+    private JTextField derivativeXField;
+    private JButton evaluateDerivativeButton;
+    private JLabel derivativeValueLabel;
 
     public DesmosCloneApp() {
-        setTitle("Function Plotter");
+        setTitle("Function Plotter - Advanced Calculus Edition");
         setDefaultCloseOperation(EXIT_ON_CLOSE);
-        setSize(1200, 800);
+        setSize(1400, 900);
         setLocationRelativeTo(null);
         initializeComponents();
         layoutComponents();
@@ -104,6 +113,15 @@ public class DesmosCloneApp extends JFrame {
         findExtremaButton = new JButton("Find Extrema");
         clearExtremaButton = new JButton("Clear Extrema");
 
+        // Initialize derivative components
+        calculateDerivativeButton = new JButton("Calculate Derivative");
+        clearDerivativeButton = new JButton("Clear Derivative");
+        showNonDiffPointsButton = new JButton("Show Non-Diff Points");
+        derivativeXField = new JTextField("0", 6);
+        evaluateDerivativeButton = new JButton("Evaluate f'(x)");
+        derivativeValueLabel = new JLabel("f'(x): N/A");
+        derivativeValueLabel.setFont(new Font("Arial", Font.PLAIN, 11));
+
         graphPanel = new GraphPanel();
         graphPanel.setBackground(bgColor);
         graphPanel.setBorder(BorderFactory.createLineBorder(Color.GRAY));
@@ -152,7 +170,6 @@ public class DesmosCloneApp extends JFrame {
         areaPanel.add(upperLimitField);
         areaPanel.add(calculateAreaButton);
 
-        // Add extrema panel
         JPanel extremaPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
         extremaPanel.setBorder(BorderFactory.createTitledBorder("Extrema Analysis"));
         extremaPanel.add(new JLabel("X Min:"));
@@ -162,12 +179,23 @@ public class DesmosCloneApp extends JFrame {
         extremaPanel.add(findExtremaButton);
         extremaPanel.add(clearExtremaButton);
 
+        // Add derivative panel
+        JPanel derivativePanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
+        derivativePanel.setBorder(BorderFactory.createTitledBorder("Derivative Analysis"));
+        derivativePanel.add(calculateDerivativeButton);
+        derivativePanel.add(clearDerivativeButton);
+        derivativePanel.add(showNonDiffPointsButton);
+        derivativePanel.add(new JLabel("x ="));
+        derivativePanel.add(derivativeXField);
+        derivativePanel.add(evaluateDerivativeButton);
+
         topPanel.add(functionScroll, BorderLayout.NORTH);
         
-        JPanel middlePanel = new JPanel(new GridLayout(3, 1, 5, 5));
+        JPanel middlePanel = new JPanel(new GridLayout(4, 1, 5, 5));
         middlePanel.add(limitsPanel);
         middlePanel.add(areaPanel);
         middlePanel.add(extremaPanel);
+        middlePanel.add(derivativePanel);
         
         topPanel.add(middlePanel, BorderLayout.CENTER);
 
@@ -177,6 +205,7 @@ public class DesmosCloneApp extends JFrame {
         JPanel bottomLeft = new JPanel(new FlowLayout(FlowLayout.LEFT));
         bottomLeft.add(statusLabel);
         bottomLeft.add(integralValueLabel);
+        bottomLeft.add(derivativeValueLabel);
         bottomPanel.add(bottomLeft, BorderLayout.WEST);
         bottomPanel.add(functionCountLabel, BorderLayout.EAST);
 
@@ -200,9 +229,11 @@ public class DesmosCloneApp extends JFrame {
             functions.clear();
             graphPanel.clearHighlight();
             graphPanel.highlightExtrema(new ArrayList<>());
+            graphPanel.clearDerivative();
             graphPanel.repaint();
             updateStatus();
             integralValueLabel.setText("Integral: N/A");
+            derivativeValueLabel.setText("f'(x): N/A");
         });
         bgColorButton.addActionListener(e -> {
             Color newColor = JColorChooser.showDialog(this, "Choose Background Color", bgColor);
@@ -223,6 +254,12 @@ public class DesmosCloneApp extends JFrame {
         // Add extrema event listeners
         findExtremaButton.addActionListener(e -> findAndDisplayExtrema());
         clearExtremaButton.addActionListener(e -> clearExtrema());
+        
+        // Add derivative event listeners
+        calculateDerivativeButton.addActionListener(e -> calculateAndDisplayDerivative());
+        clearDerivativeButton.addActionListener(e -> clearDerivative());
+        showNonDiffPointsButton.addActionListener(e -> showNonDifferentiablePoints());
+        evaluateDerivativeButton.addActionListener(e -> evaluateDerivativeAtPoint());
     }
 
     private void plotFunction() {
@@ -349,11 +386,9 @@ public class DesmosCloneApp extends JFrame {
                 return;
             }
             
-            // Find extrema for all functions
             List<ExtremaFinder.ExtremaResult> results = 
                 ExtremaFinder.findExtremaForAllFunctions(functions, xMin, xMax, 0.01);
             
-            // Collect all extrema points
             List<ExtremaFinder.ExtremaPoint> allExtrema = new ArrayList<>();
             StringBuilder summaryText = new StringBuilder("Extrema Analysis Results:\n\n");
             
@@ -362,10 +397,8 @@ public class DesmosCloneApp extends JFrame {
                 summaryText.append(result.summary).append("\n");
             }
             
-            // Display on graph
             graphPanel.highlightExtrema(allExtrema);
             
-            // Show summary dialog
             JOptionPane.showMessageDialog(this, summaryText.toString(), 
                 "Extrema Analysis", JOptionPane.INFORMATION_MESSAGE);
             
@@ -379,6 +412,126 @@ public class DesmosCloneApp extends JFrame {
     private void clearExtrema() {
         graphPanel.highlightExtrema(new ArrayList<>());
         statusLabel.setText("Extrema cleared");
+    }
+
+    // Derivative methods
+    private void calculateAndDisplayDerivative() {
+        if (functions.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "No function to differentiate.");
+            return;
+        }
+
+        try {
+            PlotFunction originalFunction = functions.get(functions.size() - 1);
+            double xMin = Double.parseDouble(xMinField.getText());
+            double xMax = Double.parseDouble(xMaxField.getText());
+            
+            Derivative.DerivativeResult result = Derivative.createDerivativeFunction(originalFunction, xMin, xMax);
+            
+            // Create derivative plot function
+            PlotFunction derivativeFunction = new PlotFunction(
+                "d/dx[" + originalFunction.getLabel() + "]", 
+                result.derivativeFunction
+            );
+            
+            // Add derivative to functions list
+            functions.add(derivativeFunction);
+            graphPanel.setFunctions(functions);
+            graphPanel.setDerivativeResult(result);
+            graphPanel.repaint();
+            
+            // Show analysis
+            JOptionPane.showMessageDialog(this, result.summary, 
+                "Derivative Analysis", JOptionPane.INFORMATION_MESSAGE);
+            
+            statusLabel.setText("Derivative calculated and plotted");
+            updateStatus();
+            
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "Error calculating derivative: " + ex.getMessage(), 
+                "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void clearDerivative() {
+        graphPanel.clearDerivative();
+        statusLabel.setText("Derivative cleared");
+        derivativeValueLabel.setText("f'(x): N/A");
+    }
+
+    private void showNonDifferentiablePoints() {
+        if (functions.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "No function to analyze.");
+            return;
+        }
+
+        try {
+            PlotFunction originalFunction = functions.get(functions.size() - 1);
+            double xMin = Double.parseDouble(xMinField.getText());
+            double xMax = Double.parseDouble(xMaxField.getText());
+            
+            Derivative.DerivativeResult result = Derivative.createDerivativeFunction(originalFunction, xMin, xMax);
+            
+            if (result.nonDifferentiablePoints.isEmpty()) {
+                JOptionPane.showMessageDialog(this, 
+                    "No non-differentiable points found in the current domain.",
+                    "Differentiability Analysis", JOptionPane.INFORMATION_MESSAGE);
+            } else {
+                StringBuilder sb = new StringBuilder("Non-differentiable points found:\n\n");
+                for (var point : result.nonDifferentiablePoints) {
+                    sb.append(String.format("x = %.4f (function may have sharp corner or cusp)\n", point.getX()));
+                }
+                JOptionPane.showMessageDialog(this, sb.toString(), 
+                    "Non-differentiable Points", JOptionPane.WARNING_MESSAGE);
+                
+                graphPanel.highlightNonDifferentiablePoints(result.nonDifferentiablePoints);
+            }
+            
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "Error in differentiability analysis: " + ex.getMessage());
+        }
+    }
+
+    private void evaluateDerivativeAtPoint() {
+        if (functions.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "No function to differentiate.");
+            return;
+        }
+
+        try {
+            double x = Double.parseDouble(derivativeXField.getText());
+            PlotFunction originalFunction = functions.get(functions.size() - 1);
+            
+            double derivativeValue = Derivative.numericalDerivative(originalFunction.getFunction(), x);
+            
+            if (Double.isFinite(derivativeValue)) {
+                derivativeValueLabel.setText(String.format("f'(%.3f) = %.6f", x, derivativeValue));
+                
+                // Check differentiability at this point
+                Derivative.LimitResult limitCheck = Derivative.checkDifferentiability(originalFunction.getFunction(), x);
+                
+                String message = String.format("f'(%.3f) = %.6f\n\n", x, derivativeValue);
+                message += "Differentiability check:\n";
+                message += limitCheck.reason + "\n";
+                if (limitCheck.limitExists) {
+                    message += String.format("Left limit: %.6f\n", limitCheck.leftLimit);
+                    message += String.format("Right limit: %.6f\n", limitCheck.rightLimit);
+                }
+                
+                JOptionPane.showMessageDialog(this, message, 
+                    "Derivative Evaluation", JOptionPane.INFORMATION_MESSAGE);
+            } else {
+                derivativeValueLabel.setText("f'(x): undefined");
+                JOptionPane.showMessageDialog(this, 
+                    "Derivative is undefined at x = " + x,
+                    "Derivative Evaluation", JOptionPane.WARNING_MESSAGE);
+            }
+            
+        } catch (NumberFormatException ex) {
+            JOptionPane.showMessageDialog(this, "Invalid x value.");
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "Error evaluating derivative: " + ex.getMessage());
+        }
     }
 
     private void saveGraphStateToFile() {
