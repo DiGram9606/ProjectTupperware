@@ -282,22 +282,31 @@ public class GraphPanel extends JPanel {
         g2.setStroke(new BasicStroke(2f));
         Path2D.Double path = new Path2D.Double();
         boolean started = false;
-        double step = (xMax - xMin) / w;
+        double step = Math.max((xMax - xMin) / w, 0.001); // minimum step size to capture detail
+
+        double prevY = Double.NaN;
         for (double x = xMin; x <= xMax; x += step) {
             double y = pf.getFunction().apply(x);
-            if (Double.isFinite(y) && y >= yMin && y <= yMax) {
-                int px = (int) ((x - xMin) * sX);
-                int py = h - (int) ((y - yMin) * sY);
-                if (!started) {
-                    path.moveTo(px, py);
-                    started = true;
-                } else {
-                    path.lineTo(px, py);
-                }
-            } else {
-                started = false;
-            }
+
+            boolean finite = Double.isFinite(y);
+            boolean jump = finite && Double.isFinite(prevY) && Math.abs(y - prevY) > 10; // jump threshold
+
+        if (finite && y >= yMin && y <= yMax && !jump) {
+        int px = (int) ((x - xMin) * sX);
+        int py = h - (int) ((y - yMin) * sY);
+        if (!started) {
+            path.moveTo(px, py);
+            started = true;
+        } else {
+            path.lineTo(px, py);
         }
+    } else {
+        started = false;
+    }
+
+    if (finite) prevY = y;
+}
+
         g2.draw(path);
     }
 
