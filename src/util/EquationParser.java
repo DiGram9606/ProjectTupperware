@@ -91,16 +91,13 @@ public class EquationParser {
             int start = index;
             while (Character.isLetter(current())) consume();
             String name = expr.substring(start, index);
-
             if (name.equals("x")) return x;
             if (name.equals("pi")) return Math.PI;
             if (name.equals("e")) return Math.E;
-
             if (current() == '(') {
                 consume();
                 double arg = parseExpression();
                 if (current() == ')') consume();
-
                 switch (name) {
                     case "sin": return Math.sin(arg);
                     case "cos": return Math.cos(arg);
@@ -111,7 +108,6 @@ public class EquationParser {
                     default: throw new RuntimeException("Unknown function: " + name);
                 }
             }
-
             throw new RuntimeException("Unknown variable or function: " + name);
         }
 

@@ -15,42 +15,34 @@ public class AreaCalculator extends JPanel {
     private JButton calculateAreaButton;
     private JButton resetLimitsButton;
     private JButton clearHighlightButton;
-
     private final DesmosCloneApp app;
 
     public AreaCalculator(DesmosCloneApp app) {
         this.app = app;
-
         setBorder(BorderFactory.createTitledBorder("Area Under Curve"));
         setLayout(new GridLayout(2, 1));
-
         JPanel inputPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
         lowerLimitField = new JTextField("0", 6);
         upperLimitField = new JTextField("1", 6);
-        inputPanel.add(new JLabel("Lower Limit (a):"));
+        inputPanel.add(new JLabel("Lower Limit(a):"));
         inputPanel.add(lowerLimitField);
-        inputPanel.add(new JLabel("Upper Limit (b):"));
+        inputPanel.add(new JLabel("Upper Limit(b):"));
         inputPanel.add(upperLimitField);
-
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
         calculateAreaButton = new JButton("Calculate Area");
         resetLimitsButton = new JButton("Reset Limits");
         clearHighlightButton = new JButton("Clear Highlight");
-
         buttonPanel.add(calculateAreaButton);
         buttonPanel.add(resetLimitsButton);
         buttonPanel.add(clearHighlightButton);
-
         add(inputPanel);
         add(buttonPanel);
-
         calculateAreaButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
                 calculateAndDisplayArea();
             }
         });
-
         resetLimitsButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -58,7 +50,6 @@ public class AreaCalculator extends JPanel {
                 upperLimitField.setText("1");
             }
         });
-
         clearHighlightButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -70,7 +61,6 @@ public class AreaCalculator extends JPanel {
     public static double computeDefiniteIntegral(Function<Double, Double> func, double a, double b, int n) {
         double h = (b - a) / n;
         double sum = 0.0;
-
         for (int i = 0; i < n; i++) {
             double x0 = a + i * h;
             double x1 = x0 + h;
@@ -80,7 +70,6 @@ public class AreaCalculator extends JPanel {
                 sum += (y0 + y1) / 2 * h;
             }
         }
-
         return sum;
     }
 
@@ -90,10 +79,8 @@ public class AreaCalculator extends JPanel {
             JOptionPane.showMessageDialog(app, "No function to integrate.");
             return;
         }
-
         PlotFunction lastFunction = functions.get(functions.size() - 1);
         Function<Double, Double> func = lastFunction.getFunction();
-
         double a, b;
         try {
             a = Double.parseDouble(lowerLimitField.getText());
@@ -106,7 +93,6 @@ public class AreaCalculator extends JPanel {
             JOptionPane.showMessageDialog(app, "Invalid limits.");
             return;
         }
-
         double h = (b - a) / 1000.0;
         double area = 0.0;
         for (int i = 0; i < 1000; i++) {
@@ -118,11 +104,7 @@ public class AreaCalculator extends JPanel {
                 area += 0.5 * (y1 + y2) * h;
             }
         }
-
         app.getGraphPanel().highlightAreaUnder(func, a, b);
-
-        JOptionPane.showMessageDialog(app,
-                String.format("Definite integral from %.3f to %.3f is approximately %.6f", a, b, area),
-                "Area Result", JOptionPane.INFORMATION_MESSAGE);
+        JOptionPane.showMessageDialog(app, String.format("Definite integral from %.3f to %.3f is approximately %.6f", a, b, area), "Area Result", JOptionPane.INFORMATION_MESSAGE);
     }
 }

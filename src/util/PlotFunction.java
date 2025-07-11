@@ -11,7 +11,7 @@ public class PlotFunction {
     public PlotFunction(String label, Function<Double, Double> function) {
         this.label = label;
         this.function = function;
-        this.color = new Color((int)(Math.random() * 0xFFFFFF));
+        this.color = new Color((int) (Math.random() * 0xFFFFFF));
     }
 
     public String getLabel() {

@@ -104,7 +104,6 @@ public class GraphPanel extends JPanel {
                 repaint();
             }
         });
-
         MouseAdapter ma = new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
@@ -169,27 +168,20 @@ public class GraphPanel extends JPanel {
         int h = getHeight();
         double sX = w / (xMax - xMin);
         double sY = h / (yMax - yMin);
-
         drawGrid(g2, w, h, sX, sY);
         drawAxes(g2, w, h, sX, sY);
         drawLabels(g2, w, h, sX, sY);
-
         if (functions != null) {
             for (PlotFunction pf : functions) {
                 drawFunction(g2, pf, w, h, sX, sY);
             }
         }
-
-        // Draw highlighted critical points
         if (!highlightedPoints.isEmpty()) {
             drawCriticalPoints(g2, w, h, sX, sY);
         }
-
-        // Draw highlighted area
         if (highlightedFunc != null) {
             drawHighlightedArea(g2, w, h, sX, sY);
         }
-
         drawLimitsInfo(g2);
     }
 
@@ -198,11 +190,8 @@ public class GraphPanel extends JPanel {
         for (Map.Entry<Point2D, String> entry : highlightedPoints.entrySet()) {
             Point2D point = entry.getKey();
             String type = entry.getValue();
-            
             int px = (int) ((point.getX() - xMin) * sX);
             int py = h - (int) ((point.getY() - yMin) * sY);
-            
-            // Set color based on type
             if (type.contains("Maximum")) {
                 g2.setColor(Color.RED);
             } else if (type.contains("Minimum")) {
@@ -210,8 +199,6 @@ public class GraphPanel extends JPanel {
             } else {
                 g2.setColor(Color.YELLOW);
             }
-            
-            // Draw point
             g2.fillOval(px - 4, py - 4, 8, 8);
             g2.setColor(Color.WHITE);
             g2.drawOval(px - 4, py - 4, 8, 8);

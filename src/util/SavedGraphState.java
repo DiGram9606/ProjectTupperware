@@ -5,7 +5,6 @@ import java.io.Serializable;
 import java.util.List;
 import java.util.function.Function;
 
-// This class stores just the serializable data
 public class SavedGraphState implements Serializable {
     private static final long serialVersionUID = 1L;
 
